@@ -42,12 +42,23 @@
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 struct netif gnetif;
+/* UART handler declaration */
+UART_HandleTypeDef UartHandle;
 /* Private function prototypes -----------------------------------------------*/
 static void SystemClock_Config(void);
 static void BSP_Config(void);
 static void Netif_Config(void);
 static void MPU_Config(void);
+#ifdef __GNUC__
+/* With GCC/RAISONANCE, small printf (option LD Linker->Libraries->Small printf
+   set to 'Yes') calls __io_putchar() */
+#define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
+#else
+#define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
+#endif /* __GNUC__ */
+static void SystemClock_Config(void);
 static void CPU_CACHE_Enable(void);
+static void UART_Init(void);
 
 /* Private functions ---------------------------------------------------------*/
 
@@ -76,6 +87,8 @@ int main(void)
 
   /* Configure the LCD, LEDs, ...*/
   BSP_Config();
+  
+  UART_Init();
 
   /* Initialize the LwIP stack */
   lwip_init();
@@ -87,6 +100,8 @@ int main(void)
   http_server_init();
 
   udp_console_connect();
+  
+  printf("** Test UART Printf successfully. ** \n\r");
 
   /* Infinite loop */
   while (1)
@@ -107,13 +122,59 @@ int main(void)
 #endif
   }
 }
+void UART_Init(void)
+{
+  /*##-1- Configure the UART peripheral ######################################*/
+  /* Put the USART peripheral in the Asynchronous mode (UART Mode) */
+  /* UART configured as follows:
+      - Word Length = 8 Bits (7 data bit + 1 parity bit) : 
+                      BE CAREFUL : Program 7 data bits + 1 parity bit in PC HyperTerminal
+      - Stop Bit    = One Stop bit
+      - Parity      = ODD parity
+      - BaudRate    = 9600 baud
+      - Hardware flow control disabled (RTS and CTS signals) */
+  UartHandle.Instance        = USARTx;
 
+  UartHandle.Init.BaudRate   = 115200;
+  UartHandle.Init.WordLength = UART_WORDLENGTH_8B;
+  UartHandle.Init.StopBits   = UART_STOPBITS_1;
+  UartHandle.Init.Parity     = UART_PARITY_NONE;
+  UartHandle.Init.HwFlowCtl  = UART_HWCONTROL_NONE;
+  UartHandle.Init.Mode       = UART_MODE_TX_RX;
+  UartHandle.Init.OverSampling = UART_OVERSAMPLING_16;
+  UartHandle.AdvancedInit.AdvFeatureInit= UART_ADVFEATURE_NO_INIT;
+
+  if(HAL_UART_DeInit(&UartHandle) != HAL_OK)
+  {
+    /* Initialization Error */
+    //Error_Handler();
+  }
+  if(HAL_UART_Init(&UartHandle) != HAL_OK)
+  {
+    /* Initialization Error */
+    //Error_Handler();
+  }
+
+}
 static void BSP_Config(void)
 {
   BSP_LED_Init(LED2);
   BSP_LED_Init(LED3);
 }
 
+/**
+  * @brief  Retargets the C library printf function to the USART.
+  * @param  None
+  * @retval None
+  */
+PUTCHAR_PROTOTYPE
+{
+  /* Place your implementation of fputc here */
+  /* e.g. write a character to the USART1 and Loop until the end of transmission */
+  HAL_UART_Transmit(&UartHandle, (uint8_t *)&ch, 1, 0xFFFF);
+
+  return ch;
+}
 /**
   * @brief  Setup the network interface
   * @param  None
