@@ -215,6 +215,16 @@ static void low_level_init(struct netif *netif)
   /* Initialize the LAN8742 ETH PHY */
   LAN8742_Init(&LAN8742);
 
+  /* Get MAC Config MAC */
+  HAL_ETH_GetMACConfig(&EthHandle, &MACConf);
+  MACConf.DuplexMode = ETH_FULLDUPLEX_MODE;
+  MACConf.Speed = ETH_SPEED_100M;
+  HAL_ETH_SetMACConfig(&EthHandle, &MACConf);
+  HAL_ETH_Start_IT(&EthHandle);
+  netif_set_up(netif);
+  netif_set_link_up(netif);
+  return;
+  
   PHYLinkState = LAN8742_GetLinkState(&LAN8742);
 
   /* Get link state */
