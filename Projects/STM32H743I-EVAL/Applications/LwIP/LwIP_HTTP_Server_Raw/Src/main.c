@@ -107,28 +107,8 @@ int main(void)
 
 static void BSP_Config(void)
 {
-  BSP_POT_Init(POT1);
-
-  BSP_LED_Init(LED1);
   BSP_LED_Init(LED2);
   BSP_LED_Init(LED3);
-  BSP_LED_Init(LED4);
-
-#ifdef USE_LCD
-
-  /* Initialize the LCD */
-  BSP_LCD_Init(0, LCD_ORIENTATION_LANDSCAPE);
-  UTIL_LCD_SetFuncDriver(&LCD_Driver);
-
-  /* Initialize LCD Log module */
-  UTIL_LCD_TRACE_Init();
-
-  /* Show Header and Footer texts */
-  UTIL_LCD_TRACE_SetHeader((uint8_t *)"Webserver Application");
-  UTIL_LCD_TRACE_SetFooter((uint8_t *)"STM32H743I-EVAL board");
-
-  LCD_UsrTrace("  State: Ethernet Initialization ...\n");
-#endif
 }
 
 /**
@@ -211,25 +191,25 @@ static void SystemClock_Config(void)
 
   /* Enable HSE Oscillator and activate PLL with HSE as source */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;
   RCC_OscInitStruct.HSIState = RCC_HSI_OFF;
   RCC_OscInitStruct.CSIState = RCC_CSI_OFF;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
 
-  RCC_OscInitStruct.PLL.PLLM = 5;
-  RCC_OscInitStruct.PLL.PLLN = 160;
+  RCC_OscInitStruct.PLL.PLLM = 4;
+  RCC_OscInitStruct.PLL.PLLN = 400;
   RCC_OscInitStruct.PLL.PLLFRACN = 0;
   RCC_OscInitStruct.PLL.PLLP = 2;
   RCC_OscInitStruct.PLL.PLLR = 2;
   RCC_OscInitStruct.PLL.PLLQ = 4;
 
   RCC_OscInitStruct.PLL.PLLVCOSEL = RCC_PLL1VCOWIDE;
-  RCC_OscInitStruct.PLL.PLLRGE = RCC_PLL1VCIRANGE_2;
+  RCC_OscInitStruct.PLL.PLLRGE = RCC_PLL1VCIRANGE_1;
   ret = HAL_RCC_OscConfig(&RCC_OscInitStruct);
   if(ret != HAL_OK)
   {
-    while(1){ ; }
+    while(1);
   }
 
   /* Select PLL as system clock source and configure  bus clocks dividers */
@@ -239,24 +219,15 @@ static void SystemClock_Config(void)
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.SYSCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_HCLK_DIV2;
-  RCC_ClkInitStruct.APB3CLKDivider = RCC_APB3_DIV2;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_APB1_DIV2;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_APB2_DIV2;
-  RCC_ClkInitStruct.APB4CLKDivider = RCC_APB4_DIV2;
+  RCC_ClkInitStruct.APB3CLKDivider = RCC_APB3_DIV2;  
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_APB1_DIV2; 
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_APB2_DIV2; 
+  RCC_ClkInitStruct.APB4CLKDivider = RCC_APB4_DIV2; 
   ret = HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4);
   if(ret != HAL_OK)
   {
-    while(1){ ; }
+    while(1);
   }
-
-  /*activate CSI clock mondatory for I/O Compensation Cell*/
-  __HAL_RCC_CSI_ENABLE() ;
-
-  /* Enable SYSCFG clock mondatory for I/O Compensation Cell */
-  __HAL_RCC_SYSCFG_CLK_ENABLE() ;
-
-  /* Enables the I/O Compensation Cell */
-  HAL_EnableCompensationCell();
 }
 
 /**
@@ -317,23 +288,6 @@ static void MPU_Config(void)
   MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
 
   HAL_MPU_ConfigRegion(&MPU_InitStruct);
-
-#ifdef USE_LCD
-/* Configure the MPU attributes as WT for OctoSPI RAM */
-  MPU_InitStruct.Enable = MPU_REGION_ENABLE;
-  MPU_InitStruct.BaseAddress = LCD_LAYER_0_ADDRESS;
-  MPU_InitStruct.Size = MPU_REGION_SIZE_16MB;
-  MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
-  MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
-  MPU_InitStruct.IsCacheable = MPU_ACCESS_CACHEABLE;
-  MPU_InitStruct.IsShareable = MPU_ACCESS_NOT_SHAREABLE;
-  MPU_InitStruct.Number = MPU_REGION_NUMBER3;
-  MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
-  MPU_InitStruct.SubRegionDisable = 0x00;
-  MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
-
-  HAL_MPU_ConfigRegion(&MPU_InitStruct);
-#endif
 
   /* Enable the MPU */
   HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
