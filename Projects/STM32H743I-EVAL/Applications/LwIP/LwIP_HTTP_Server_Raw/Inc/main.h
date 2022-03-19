@@ -32,6 +32,14 @@
 /* Exported types ------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/
 //#define USE_LCD        /* enable LCD  */
+/* UDP local connection port */
+#define UDP_SERVER_PORT    ((uint16_t)8080U)
+
+/*Static DEST IP ADDRESS: DEST_IP_ADDR0.DEST_IP_ADDR1.DEST_IP_ADDR2.DEST_IP_ADDR3 */
+#define DEST_IP_ADDR0   ((uint8_t)192U)
+#define DEST_IP_ADDR1   ((uint8_t)168U)
+#define DEST_IP_ADDR2   ((uint8_t)8U)
+#define DEST_IP_ADDR3   ((uint8_t)22U)
 
 /*Static IP ADDRESS: IP_ADDR0.IP_ADDR1.IP_ADDR2.IP_ADDR3 */
 #define IP_ADDR0   ((uint8_t) 192U)

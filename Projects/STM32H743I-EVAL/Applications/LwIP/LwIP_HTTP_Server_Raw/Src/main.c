@@ -32,6 +32,7 @@
 #include "main.h"
 #include "app_ethernet.h"
 #include "http_cgi_ssi.h"
+#include "udp_console.h"
 #ifdef USE_LCD
 #include "lcd_trace.h"
 #endif
@@ -84,6 +85,8 @@ int main(void)
 
   /* Http webserver Init */
   http_server_init();
+
+  udp_console_connect();
 
   /* Infinite loop */
   while (1)
