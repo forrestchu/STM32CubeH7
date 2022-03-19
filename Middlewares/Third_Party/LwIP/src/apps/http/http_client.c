@@ -69,7 +69,7 @@
 
 /** Set this to 1 to keep server name and uri in request state */
 #ifndef HTTPC_DEBUG_REQUEST
-#define HTTPC_DEBUG_REQUEST         0
+#define HTTPC_DEBUG_REQUEST         1
 #endif
 
 /** This string is passed in the HTTP header as "User-Agent: " */
@@ -105,6 +105,16 @@
     "Connection: Close\r\n" /* we don't support persistent connections, yet */ \
     "\r\n"
 #define HTTPC_REQ_11_HOST_FORMAT(uri, srv_name) HTTPC_REQ_11_HOST, uri, HTTPC_CLIENT_AGENT, srv_name
+
+/* GET request with host and range */
+#define HTTPC_REQ_11_HOST_RANGE "GET %s HTTP/1.1\r\n" /* URI */\
+    "User-Agent: %s\r\n" /* User-Agent */ \
+    "Accept: */*\r\n" \
+    "Host: %s\r\n" /* server name */ \
+    "Range: bytes=%u-\r\n"/* range */\
+    "Connection: Close\r\n" /* we don't support persistent connections, yet */ \
+    "\r\n"
+#define HTTPC_REQ_11_HOST_RANGE_FORMAT(uri, srv_name,start) HTTPC_REQ_11_HOST_RANGE, uri, HTTPC_CLIENT_AGENT, srv_name, start
 
 /* GET request with proxy */
 #define HTTPC_REQ_11_PROXY "GET http://%s%s HTTP/1.1\r\n" /* HOST, URI */\
@@ -188,10 +198,13 @@ httpc_free_state(httpc_state_t* req)
 }
 
 /** Close the connection: call finished callback and free the state */
-static err_t
+err_t
 httpc_close(httpc_state_t* req, httpc_result_t result, u32_t server_response, err_t err)
 {
   if (req != NULL) {
+    //cancel all dns reqs
+    dns_cancel_pending(req->server_name, req);
+
     if (req->conn_settings != NULL) {
       if (req->conn_settings->result_fn != NULL) {
         req->conn_settings->result_fn(req->callback_arg, result, req->rx_content_len, server_response, err);
@@ -283,6 +296,7 @@ httpc_tcp_recv(void *arg, struct altcp_pcb *pcb, struct pbuf *p, err_t r)
   LWIP_UNUSED_ARG(r);
 
   if (p == NULL) {
+    printf("httpc_tcp_recv conn closed: %d\r\n", r);
     httpc_result_t result;
     if (req->parse_state != HTTPC_PARSE_RX_DATA) {
       /* did not get RX data yet */
@@ -358,6 +372,8 @@ httpc_tcp_err(void *arg, err_t err)
     req->pcb = NULL;
     httpc_close(req, HTTPC_RESULT_ERR_CLOSED, 0, err);
   }
+
+  printf("httpc_tcp_err: %d\r\n", err);
 }
 
 /** http client tcp poll callback */
@@ -397,7 +413,6 @@ httpc_tcp_connected(void *arg, struct altcp_pcb *pcb, err_t err)
   httpc_state_t* req = (httpc_state_t*)arg;
   LWIP_UNUSED_ARG(pcb);
   LWIP_UNUSED_ARG(err);
-
   /* send request; last char is zero termination */
   r = altcp_write(req->pcb, req->request->payload, req->request->len - 1, TCP_WRITE_FLAG_COPY);
   if (r != ERR_OK) {
@@ -444,7 +459,6 @@ httpc_dns_found(const char* hostname, const ip_addr_t *ipaddr, void *arg)
   httpc_result_t result;
 
   LWIP_UNUSED_ARG(hostname);
-
   if (ipaddr != NULL) {
     err = httpc_get_internal_addr(req, ipaddr);
     if (err == ERR_OK) {
@@ -496,12 +510,16 @@ httpc_create_request_string(const httpc_connection_t *settings, const char* serv
     }
   } else if (use_host) {
     LWIP_ASSERT("server_name != NULL", server_name != NULL);
-    return snprintf(buffer, buffer_size, HTTPC_REQ_11_HOST_FORMAT(uri, server_name));
+    if(settings->start_pos > 0)
+        return snprintf(buffer, buffer_size, HTTPC_REQ_11_HOST_RANGE_FORMAT(uri, server_name, settings->start_pos));
+    else
+        return snprintf(buffer, buffer_size, HTTPC_REQ_11_HOST_FORMAT(uri, server_name));
   } else {
     return snprintf(buffer, buffer_size, HTTPC_REQ_11_FORMAT(uri));
   }
 }
-
+#define MAX_HEDER_LEN 1024
+static char header_buf[MAX_HEDER_LEN];
 /** Initialize the connection struct */
 static err_t
 httpc_init_connection_common(httpc_state_t **connection, const httpc_connection_t *settings, const char* server_name,
@@ -518,8 +536,9 @@ httpc_init_connection_common(httpc_state_t **connection, const httpc_connection_
   LWIP_ASSERT("uri != NULL", uri != NULL);
 
   /* get request len */
-  req_len = httpc_create_request_string(settings, server_name, server_port, uri, use_host, NULL, 0);
-  if ((req_len < 0) || (req_len > 0xFFFF)) {
+  req_len = httpc_create_request_string(settings, server_name, server_port, uri, use_host, header_buf, MAX_HEDER_LEN);
+  printf("httpc_create_request_string req_len = %d\r\n", req_len);
+  if ((req_len < 0) || (req_len >= MAX_HEDER_LEN)) {
     return ERR_VAL;
   }
   /* alloc state and request in one block */
@@ -564,16 +583,19 @@ httpc_init_connection_common(httpc_state_t **connection, const httpc_connection_
     httpc_free_state(req);
     return ERR_MEM;
   }
+  
+  ip_set_option(req->pcb, SOF_KEEPALIVE);
   req->remote_port = settings->use_proxy ? settings->proxy_port : server_port;
   altcp_arg(req->pcb, req);
   altcp_recv(req->pcb, httpc_tcp_recv);
   altcp_err(req->pcb, httpc_tcp_err);
-  altcp_poll(req->pcb, httpc_tcp_poll, HTTPC_POLL_INTERVAL);
+  //altcp_poll(req->pcb, httpc_tcp_poll, HTTPC_POLL_INTERVAL);
   altcp_sent(req->pcb, httpc_tcp_sent);
 
   /* set up request buffer */
   req_len2 = httpc_create_request_string(settings, server_name, server_port, uri, use_host,
     (char *)req->request->payload, req_len + 1);
+  printf("httpc_create_request_string req_len2 = %d\r\n", req_len2);
   if (req_len2 != req_len) {
     httpc_free_state(req);
     return ERR_VAL;

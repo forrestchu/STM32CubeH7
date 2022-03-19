@@ -25,6 +25,9 @@
 #include "ethernetif.h"
 #include "lwip/netif.h"
 #include "lwip/tcpip.h"
+#include "lwip/opt.h"
+#include "lwip/init.h"
+#include "netif/etharp.h"
 #include "httpserver_netconn.h"
 #include "app_ethernet.h"
 
@@ -89,13 +92,14 @@ int main(void)
 static void StartThread(void const * argument)
 {   
   /* Create tcp_ip stack thread */
-  tcpip_init(NULL, NULL);
+  //tcpip_init(NULL, NULL);
+  lwip_init();
   
   /* Initialize the LwIP stack */
   Netif_Config();
 
   /* Initialize webserver demo */
-  http_server_netconn_init();
+  //http_server_netconn_init();
   
   for( ;; )
   {
@@ -137,7 +141,7 @@ static void Netif_Config(void)
 #endif /* LWIP_DHCP */
   
   /* add the network interface */    
-  netif_add(&gnetif, &ipaddr, &netmask, &gw, NULL, &ethernetif_init, &tcpip_input);
+  netif_add(&gnetif, &ipaddr, &netmask, &gw, NULL, &ethernetif_init, &ethernet_input);
   
   /*  Registers the default network interface. */
   netif_set_default(&gnetif);

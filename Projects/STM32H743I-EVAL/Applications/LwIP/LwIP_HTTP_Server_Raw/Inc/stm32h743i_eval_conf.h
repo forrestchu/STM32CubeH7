@@ -29,7 +29,7 @@
 
 /* COM usage define */
 #define USE_COM_LOG                         0U
-#define USE_BSP_COM_FEATURE                 0U
+#define USE_BSP_COM_FEATURE                 1U
 
 /* POT usage define */
 #define USE_BSP_POT_FEATURE                 1U

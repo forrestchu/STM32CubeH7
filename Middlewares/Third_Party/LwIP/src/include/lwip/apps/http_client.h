@@ -126,6 +126,7 @@ typedef struct _httpc_connection {
   ip_addr_t proxy_addr;
   u16_t proxy_port;
   u8_t use_proxy;
+  u32_t start_pos;
   /* @todo: add username:pass? */
 
 #if LWIP_ALTCP

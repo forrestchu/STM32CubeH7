@@ -34,7 +34,7 @@
 /*Static IP ADDRESS*/
 #define IP_ADDR0   ((uint8_t)192U)
 #define IP_ADDR1   ((uint8_t)168U)
-#define IP_ADDR2   ((uint8_t)0U)
+#define IP_ADDR2   ((uint8_t)8U)
 #define IP_ADDR3   ((uint8_t)10U)
 
 /*NETMASK*/
@@ -46,7 +46,7 @@
 /*Gateway Address*/
 #define GW_ADDR0   ((uint8_t)192U)
 #define GW_ADDR1   ((uint8_t)168U)
-#define GW_ADDR2   ((uint8_t)0U)
+#define GW_ADDR2   ((uint8_t)8U)
 #define GW_ADDR3   ((uint8_t)1U)
 
 /* Exported macro ------------------------------------------------------------*/

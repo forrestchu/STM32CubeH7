@@ -40,7 +40,7 @@
  * allocation and deallocation.
  */
 #define SYS_LIGHTWEIGHT_PROT    0
-
+#define MEMP_NUM_SYS_TIMEOUT 30
 /**
  * NO_SYS==1: Provides VERY minimal functionality. Otherwise,
  * use lwIP facilities.
@@ -55,26 +55,21 @@
 
 /* MEM_SIZE: the size of the heap memory. If the application will send
 a lot of data that needs to be copied, this should be set high. */
-#define MEM_SIZE                (14*1024)
+#define MEM_SIZE                (64*1024)
 
 /* Relocate the LwIP RAM heap pointer */
-#define LWIP_RAM_HEAP_POINTER    (0x30004000)
+#define LWIP_RAM_HEAP_POINTER    (0x30010000)
 
 
 /* MEMP_NUM_TCP_PCB: the number of simulatenously active TCP
    connections. */
 #define MEMP_NUM_TCP_PCB        10
 
-/* MEMP_NUM_TCP_SEG: the number of simultaneously queued TCP
-   segments. */
-#define MEMP_NUM_TCP_SEG        TCP_SND_QUEUELEN
-
-
 /* ---------- Pbuf options ---------- */
 
 /* PBUF_POOL_BUFSIZE: the size of each pbuf in the pbuf pool */
-#define PBUF_POOL_BUFSIZE       1528
-
+//#define PBUF_POOL_BUFSIZE       1528
+//#define PBUF_POOL_SIZE              32
 /* LWIP_SUPPORT_CUSTOM_PBUF == 1: to pass directly MAC Rx buffers to the stack 
    no copy is needed */
 #define LWIP_SUPPORT_CUSTOM_PBUF      1
@@ -95,19 +90,27 @@ a lot of data that needs to be copied, this should be set high. */
 #define TCP_MSS                 (1500 - 40)	  /* TCP_MSS = (Ethernet MTU - IP header size - TCP header size) */
 
 /* TCP sender buffer space (bytes). */
-#define TCP_SND_BUF             (4*TCP_MSS)
-
+#define TCP_SND_BUF             (16*TCP_MSS)
+/* MEMP_NUM_TCP_SEG: the number of simultaneously queued TCP
+   segments. */
+#define MEMP_NUM_TCP_SEG    TCP_SND_QUEUELEN
 
 /* TCP receive window. */
-#define TCP_WND                (4*TCP_MSS)
+#define TCP_WND                (24*TCP_MSS)
+
+#define LWIP_TCP_KEEPALIVE         1
+#define TCP_KEEPIDLE_DEFAULT     15000
+#define TCP_KEEPINTVL_DEFAULT   8000
+#define TCP_KEEPCNT_DEFAULT       4
 
 /* ---------- ICMP options ---------- */
 #define LWIP_ICMP                       1
 
 
 /* ---------- DHCP options ---------- */
-#define LWIP_DHCP               1
-
+#define LWIP_DHCP               0
+#define LWIP_DNS                1
+#define DNS_MAX_SERVERS                 4
 
 /* ---------- UDP options ---------- */
 #define LWIP_UDP                1
@@ -116,6 +119,7 @@ a lot of data that needs to be copied, this should be set high. */
 
 /* ---------- Statistics options ---------- */
 #define LWIP_STATS 0
+#define LWIP_DEBUG
 
 /*
    --------------------------------------
@@ -206,6 +210,12 @@ The STM32H7xx allows computing and verifying the IP, UDP, TCP and ICMP checksums
 #define HTTPD_USE_CUSTOM_FSDATA   1
 #define MEMP_DEBUG LWIP_DBG_ON
 #define MEM_DEBUG LWIP_DBG_ON
+#define DNS_DEBUG LWIP_DBG_ON
+#define HTTPC_DEBUG LWIP_DBG_ON
+//#define TCP_DEBUG LWIP_DBG_ON
+//#define TCP_INPUT_DEBUG                 LWIP_DBG_ON
+//#define TCP_OUTPUT_DEBUG                LWIP_DBG_ON
+#define TCP_RST_DEBUG                   LWIP_DBG_ON
 
 #endif /* __LWIPOPTS_H__ */
 
