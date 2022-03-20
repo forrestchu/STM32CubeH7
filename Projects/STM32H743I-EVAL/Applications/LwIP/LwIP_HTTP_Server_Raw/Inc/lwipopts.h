@@ -101,6 +101,11 @@ a lot of data that needs to be copied, this should be set high. */
 /* TCP receive window. */
 #define TCP_WND                (4*TCP_MSS)
 
+#define LWIP_TCP_KEEPALIVE         1
+#define TCP_KEEPIDLE_DEFAULT     15000
+#define TCP_KEEPINTVL_DEFAULT   8000
+#define TCP_KEEPCNT_DEFAULT       4
+
 /* ---------- ICMP options ---------- */
 #define LWIP_ICMP                       1
 

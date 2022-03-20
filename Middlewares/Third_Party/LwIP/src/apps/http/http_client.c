@@ -567,6 +567,8 @@ httpc_init_connection_common(httpc_state_t **connection, const httpc_connection_
     httpc_free_state(req);
     return ERR_MEM;
   }
+  
+  ip_set_option(req->pcb, SOF_KEEPALIVE);
   req->remote_port = settings->use_proxy ? settings->proxy_port : server_port;
   altcp_arg(req->pcb, req);
   altcp_recv(req->pcb, httpc_tcp_recv);
