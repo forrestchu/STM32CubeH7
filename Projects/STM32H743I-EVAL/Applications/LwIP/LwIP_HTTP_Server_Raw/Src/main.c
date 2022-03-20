@@ -89,6 +89,8 @@ int main(void)
   BSP_Config();
   
   UART_Init();
+  
+  printf("** Test UART Printf successfully. ** \n\r");
 
   /* Initialize the LwIP stack */
   lwip_init();
@@ -101,9 +103,7 @@ int main(void)
 
   udp_console_connect();
   
-  printf("** Test UART Printf successfully. ** \n\r");
-
-  httpc_loader_create("http://commonuser-1256223703.cos.ap-beijing.myqcloud.com/bs/mtlun001/eee.mp4");
+  start_download("http://commonuser-1256223703.cos.ap-beijing.myqcloud.com/bs/mtlun001/eee.mp4");
 
   /* Infinite loop */
   while (1)

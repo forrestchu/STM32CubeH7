@@ -106,6 +106,16 @@
     "\r\n"
 #define HTTPC_REQ_11_HOST_FORMAT(uri, srv_name) HTTPC_REQ_11_HOST, uri, HTTPC_CLIENT_AGENT, srv_name
 
+/* GET request with host and range */
+#define HTTPC_REQ_11_HOST_RANGE "GET %s HTTP/1.1\r\n" /* URI */\
+    "User-Agent: %s\r\n" /* User-Agent */ \
+    "Accept: */*\r\n" \
+    "Host: %s\r\n" /* server name */ \
+    "Range: bytes=%u-\r\n"/* range */\
+    "Connection: Close\r\n" /* we don't support persistent connections, yet */ \
+    "\r\n"
+#define HTTPC_REQ_11_HOST_RANGE_FORMAT(uri, srv_name,start) HTTPC_REQ_11_HOST_RANGE, uri, HTTPC_CLIENT_AGENT, srv_name, start
+
 /* GET request with proxy */
 #define HTTPC_REQ_11_PROXY "GET http://%s%s HTTP/1.1\r\n" /* HOST, URI */\
     "User-Agent: %s\r\n" /* User-Agent */ \
@@ -498,7 +508,10 @@ httpc_create_request_string(const httpc_connection_t *settings, const char* serv
     }
   } else if (use_host) {
     LWIP_ASSERT("server_name != NULL", server_name != NULL);
-    return snprintf(buffer, buffer_size, HTTPC_REQ_11_HOST_FORMAT(uri, server_name));
+    if(settings->start_pos > 0)
+        return snprintf(buffer, buffer_size, HTTPC_REQ_11_HOST_RANGE_FORMAT(uri, server_name, settings->start_pos));
+    else
+        return snprintf(buffer, buffer_size, HTTPC_REQ_11_HOST_FORMAT(uri, server_name));
   } else {
     return snprintf(buffer, buffer_size, HTTPC_REQ_11_FORMAT(uri));
   }

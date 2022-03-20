@@ -29,7 +29,7 @@
 /* Exported constants --------------------------------------------------------*/   
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */
-void httpc_loader_create(char * url);
+int start_download(char * url);//start download url, return 0 if success
 
 #ifdef __cplusplus
 }
