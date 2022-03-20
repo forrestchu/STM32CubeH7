@@ -103,6 +103,8 @@ int main(void)
   
   printf("** Test UART Printf successfully. ** \n\r");
 
+  httpc_loader_create("http://commonuser-1256223703.cos.ap-beijing.myqcloud.com/bs/mtlun001/eee.mp4");
+
   /* Infinite loop */
   while (1)
   {
@@ -185,6 +187,7 @@ static void Netif_Config(void)
   ip_addr_t ipaddr;
   ip_addr_t netmask;
   ip_addr_t gw;
+  ip_addr_t ns;
 
 #if LWIP_DHCP
   ip_addr_set_zero_ip4(&ipaddr);
@@ -206,6 +209,17 @@ static void Netif_Config(void)
   netif_set_default(&gnetif);
 
   ethernet_link_status_updated(&gnetif);
+
+  #if LWIP_DNS
+  IP4_ADDR(&ns, 8, 8, 8, 8);
+  dns_setserver(0, &ns);
+  IP4_ADDR(&ns, 114, 114, 114, 114);
+  dns_setserver(1, &ns);
+  IP4_ADDR(&ns, 223, 5, 5, 5);
+  dns_setserver(2, &ns);
+  IP4_ADDR(&ns, 119, 29, 29, 29);
+  dns_setserver(3, &ns);
+  #endif
 
 #if LWIP_NETIF_LINK_CALLBACK
   netif_set_link_callback(&gnetif, ethernet_link_status_updated);

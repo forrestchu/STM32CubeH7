@@ -346,6 +346,7 @@ void pbuf_free_custom(struct pbuf *p)
   if (RxAllocStatus == RX_ALLOC_ERROR)
   {
     RxAllocStatus = RX_ALLOC_OK;
+    printf("pbuf_free_custom free a pool\r\n");
   }
 }
 
@@ -585,6 +586,7 @@ void HAL_ETH_RxAllocateCallback(uint8_t **buff)
   {
     RxAllocStatus = RX_ALLOC_ERROR;
     *buff = NULL;
+    printf("HAL_ETH_RxAllocateCallback pool exhausted\r\n");
   }
 }
 

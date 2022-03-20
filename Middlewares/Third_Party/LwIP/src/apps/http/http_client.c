@@ -283,6 +283,7 @@ httpc_tcp_recv(void *arg, struct altcp_pcb *pcb, struct pbuf *p, err_t r)
   LWIP_UNUSED_ARG(r);
 
   if (p == NULL) {
+    printf("httpc_tcp_recv conn closed: %d\r\n", r);
     httpc_result_t result;
     if (req->parse_state != HTTPC_PARSE_RX_DATA) {
       /* did not get RX data yet */
@@ -358,6 +359,8 @@ httpc_tcp_err(void *arg, err_t err)
     req->pcb = NULL;
     httpc_close(req, HTTPC_RESULT_ERR_CLOSED, 0, err);
   }
+
+  printf("httpc_tcp_err: %d\r\n", err);
 }
 
 /** http client tcp poll callback */
@@ -444,7 +447,6 @@ httpc_dns_found(const char* hostname, const ip_addr_t *ipaddr, void *arg)
   httpc_result_t result;
 
   LWIP_UNUSED_ARG(hostname);
-
   if (ipaddr != NULL) {
     err = httpc_get_internal_addr(req, ipaddr);
     if (err == ERR_OK) {
@@ -501,7 +503,7 @@ httpc_create_request_string(const httpc_connection_t *settings, const char* serv
     return snprintf(buffer, buffer_size, HTTPC_REQ_11_FORMAT(uri));
   }
 }
-
+char header_buf[512];
 /** Initialize the connection struct */
 static err_t
 httpc_init_connection_common(httpc_state_t **connection, const httpc_connection_t *settings, const char* server_name,
@@ -518,7 +520,8 @@ httpc_init_connection_common(httpc_state_t **connection, const httpc_connection_
   LWIP_ASSERT("uri != NULL", uri != NULL);
 
   /* get request len */
-  req_len = httpc_create_request_string(settings, server_name, server_port, uri, use_host, NULL, 0);
+  req_len = httpc_create_request_string(settings, server_name, server_port, uri, use_host, header_buf, 512);
+  printf("httpc_create_request_string req_len = %d\r\n", req_len);
   if ((req_len < 0) || (req_len > 0xFFFF)) {
     return ERR_VAL;
   }
@@ -568,12 +571,13 @@ httpc_init_connection_common(httpc_state_t **connection, const httpc_connection_
   altcp_arg(req->pcb, req);
   altcp_recv(req->pcb, httpc_tcp_recv);
   altcp_err(req->pcb, httpc_tcp_err);
-  altcp_poll(req->pcb, httpc_tcp_poll, HTTPC_POLL_INTERVAL);
+  //altcp_poll(req->pcb, httpc_tcp_poll, HTTPC_POLL_INTERVAL);
   altcp_sent(req->pcb, httpc_tcp_sent);
 
   /* set up request buffer */
   req_len2 = httpc_create_request_string(settings, server_name, server_port, uri, use_host,
     (char *)req->request->payload, req_len + 1);
+  printf("httpc_create_request_string req_len2 = %d\r\n", req_len2);
   if (req_len2 != req_len) {
     httpc_free_state(req);
     return ERR_VAL;
