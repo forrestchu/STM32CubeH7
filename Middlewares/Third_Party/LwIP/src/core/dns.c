@@ -394,7 +394,7 @@ dns_getserver(u8_t numdns)
 void
 dns_tmr(void)
 {
-  LWIP_DEBUGF(DNS_DEBUG, ("dns_tmr: dns_check_entries\n"));
+  //LWIP_DEBUGF(DNS_DEBUG, ("dns_tmr: dns_check_entries\n"));
   dns_check_entries();
 }
 

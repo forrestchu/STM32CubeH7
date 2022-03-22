@@ -34,6 +34,7 @@
 
 typedef struct loader_mgt{
 	uint8_t is_running;
+	uint32_t worker_cnt;
 }loader_mgt_t;
 
 typedef struct loader_worker{
@@ -46,6 +47,7 @@ typedef struct loader_worker{
     uint32_t start_time;
 	uint32_t conn_start_time;
 	uint32_t conn_id;
+	uint32_t worker_id;
 }loader_worker_t;
 
 void worker_restart(loader_worker_t *worker);
@@ -121,6 +123,7 @@ void on_httpc_finish(void *arg, httpc_result_t httpc_result, u32_t rx_content_le
     if(worker->total_len > 0 && worker->recved_len >= worker->total_len){
 		printf("download finished, total_len=%uByte, spent=%ums\r\n", worker->total_len, time_span(worker->start_time));
 		get_mgr_singleton()->is_running = 0;
+		start_download("http://commonuser-1256223703.cos.ap-beijing.myqcloud.com/bs/mtlun001/eee.mp4");
 	}else{
 		sys_timeout(3000, worker_restart, worker);
 	}
@@ -157,7 +160,7 @@ err_t on_httpc_data(void *arg, struct altcp_pcb *conn, struct pbuf *p, err_t err
         //printf("recv len=%d\r\n", p->tot_len);
         worker->recved_len += p->tot_len;
         altcp_recved(conn, p->tot_len);
-        printf("[%u]:%u->%u/%u\r\n", worker->conn_id, p->tot_len, worker->recved_len, worker->total_len);
+        printf("[%u-%u]:%u->%u/%u\r\n", worker->worker_id, worker->conn_id, p->tot_len, worker->recved_len, worker->total_len);
         pbuf_free(p);
     }
 
@@ -178,7 +181,7 @@ err_t worker_start(loader_worker_t *worker){
     worker->conn_settings.use_proxy = 0;
     worker->conn_settings.headers_done_fn = on_httpc_headers;
     worker->conn_settings.result_fn = on_httpc_finish;
-	worker->start_time = sys_now();
+    worker->start_time = sys_now();
 	
     err = httpc_get_file_dns(worker->host, 80, worker->uri, &worker->conn_settings, on_httpc_data, worker, &worker->conn_state);
     return err;
@@ -188,6 +191,7 @@ void worker_restart(loader_worker_t *worker){
 	err_t err = ERR_OK;
 	worker->conn_settings.start_pos = worker->recved_len;
 	worker->conn_id++;
+	
 	err = httpc_get_file_dns(worker->host, 80, worker->uri, &worker->conn_settings, on_httpc_data, worker, &worker->conn_state);
 	printf("worker_restart result=%d\r\n", err);
 
@@ -213,7 +217,8 @@ int start_download(char * url)
 		worker_free(worker);
         return -2;
     }
-	
+    m->worker_cnt++;
+    worker->worker_id = m->worker_cnt;
     printf("extract info in url: host=%s, uri=%s\r\n", worker->host, worker->uri);
     ret = worker_start(worker);
 	if(ret != ERR_OK){

@@ -40,7 +40,7 @@
  * allocation and deallocation.
  */
 #define SYS_LIGHTWEIGHT_PROT    0
-
+#define MEMP_NUM_SYS_TIMEOUT 30
 /**
  * NO_SYS==1: Provides VERY minimal functionality. Otherwise,
  * use lwIP facilities.
