@@ -34,8 +34,8 @@
 
 #define ETH_DMA_TRANSMIT_TIMEOUT                (20U)
 
-#define ETH_RX_BUFFER_SIZE            1000U
-#define ETH_RX_BUFFER_CNT             12U
+#define ETH_RX_BUFFER_SIZE            1500U
+#define ETH_RX_BUFFER_CNT             10U
 #define ETH_TX_BUFFER_MAX             ((ETH_TX_DESC_CNT) * 2U)
 
 /* Private macro -------------------------------------------------------------*/
@@ -191,6 +191,7 @@ static void low_level_init(struct netif *netif)
   LAN8742_Init(&LAN8742);
 
   ethernet_link_check_state(netif);
+  printf("zzzz rx buf=0x%X\r\n", memp_memory_RX_POOL_base);
 }
 
 /**

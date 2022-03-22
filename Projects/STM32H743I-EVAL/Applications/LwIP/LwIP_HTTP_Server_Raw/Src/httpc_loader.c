@@ -158,6 +158,9 @@ err_t on_httpc_data(void *arg, struct altcp_pcb *conn, struct pbuf *p, err_t err
         altcp_close(conn);
     }else{
         //printf("recv len=%d\r\n", p->tot_len);
+			  if(p->tot_len != p->len){
+				    printf("recv first node len=%d\r\n", p->len);
+				}
         worker->recved_len += p->tot_len;
         altcp_recved(conn, p->tot_len);
         printf("[%u-%u]:%u->%u/%u\r\n", worker->worker_id, worker->conn_id, p->tot_len, worker->recved_len, worker->total_len);

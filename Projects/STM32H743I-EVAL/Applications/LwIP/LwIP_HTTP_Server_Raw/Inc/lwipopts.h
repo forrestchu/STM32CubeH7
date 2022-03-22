@@ -55,7 +55,7 @@
 
 /* MEM_SIZE: the size of the heap memory. If the application will send
 a lot of data that needs to be copied, this should be set high. */
-#define MEM_SIZE                (256*1024)
+#define MEM_SIZE                (128*1024)
 
 /* Relocate the LwIP RAM heap pointer */
 #define LWIP_RAM_HEAP_POINTER    (0x30004000)
@@ -99,7 +99,7 @@ a lot of data that needs to be copied, this should be set high. */
 
 
 /* TCP receive window. */
-#define TCP_WND                (4*TCP_MSS)
+#define TCP_WND                (6*TCP_MSS)
 
 #define LWIP_TCP_KEEPALIVE         1
 #define TCP_KEEPIDLE_DEFAULT     15000
@@ -215,7 +215,7 @@ The STM32H7xx allows computing and verifying the IP, UDP, TCP and ICMP checksums
 #define MEM_DEBUG LWIP_DBG_ON
 #define DNS_DEBUG LWIP_DBG_ON
 #define HTTPC_DEBUG LWIP_DBG_ON
-#define TCP_DEBUG LWIP_DBG_ON
+//#define TCP_DEBUG LWIP_DBG_ON
 //#define TCP_INPUT_DEBUG                 LWIP_DBG_ON
 //#define TCP_OUTPUT_DEBUG                LWIP_DBG_ON
 #define TCP_RST_DEBUG                   LWIP_DBG_ON
