@@ -55,26 +55,21 @@
 
 /* MEM_SIZE: the size of the heap memory. If the application will send
 a lot of data that needs to be copied, this should be set high. */
-#define MEM_SIZE                (128*1024)
+#define MEM_SIZE                (64*1024)
 
 /* Relocate the LwIP RAM heap pointer */
-#define LWIP_RAM_HEAP_POINTER    (0x30004000)
+#define LWIP_RAM_HEAP_POINTER    (0x30010000)
 
 
 /* MEMP_NUM_TCP_PCB: the number of simulatenously active TCP
    connections. */
 #define MEMP_NUM_TCP_PCB        10
 
-/* MEMP_NUM_TCP_SEG: the number of simultaneously queued TCP
-   segments. */
-#define MEMP_NUM_TCP_SEG        TCP_SND_QUEUELEN
-
-
 /* ---------- Pbuf options ---------- */
 
 /* PBUF_POOL_BUFSIZE: the size of each pbuf in the pbuf pool */
-#define PBUF_POOL_BUFSIZE       1528
-
+//#define PBUF_POOL_BUFSIZE       1528
+//#define PBUF_POOL_SIZE              32
 /* LWIP_SUPPORT_CUSTOM_PBUF == 1: to pass directly MAC Rx buffers to the stack 
    no copy is needed */
 #define LWIP_SUPPORT_CUSTOM_PBUF      1
@@ -95,11 +90,13 @@ a lot of data that needs to be copied, this should be set high. */
 #define TCP_MSS                 (1500 - 40)	  /* TCP_MSS = (Ethernet MTU - IP header size - TCP header size) */
 
 /* TCP sender buffer space (bytes). */
-#define TCP_SND_BUF             (4*TCP_MSS)
-
+#define TCP_SND_BUF             (16*TCP_MSS)
+/* MEMP_NUM_TCP_SEG: the number of simultaneously queued TCP
+   segments. */
+#define MEMP_NUM_TCP_SEG    TCP_SND_QUEUELEN
 
 /* TCP receive window. */
-#define TCP_WND                (6*TCP_MSS)
+#define TCP_WND                (16*TCP_MSS)
 
 #define LWIP_TCP_KEEPALIVE         1
 #define TCP_KEEPIDLE_DEFAULT     15000
