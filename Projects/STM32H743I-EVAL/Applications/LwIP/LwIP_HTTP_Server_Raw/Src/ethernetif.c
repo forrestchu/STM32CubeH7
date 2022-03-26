@@ -191,7 +191,7 @@ static void low_level_init(struct netif *netif)
   LAN8742_Init(&LAN8742);
 
   ethernet_link_check_state(netif);
-  printf("zzzz rx buf=0x%X\r\n", memp_memory_RX_POOL_base);
+  
 }
 
 /**

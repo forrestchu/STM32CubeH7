@@ -24,13 +24,19 @@
  extern "C" {
 #endif
 
+typedef struct download_stat{
+    uint32_t total_len;
+    uint32_t recved_len;
+    uint32_t speed;
+}download_stat_t;
 /* Includes ------------------------------------------------------------------*/
 /* Exported types ------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/   
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */
-int start_download(char * url);//start download url, return 0 if success
-
+int download_start(char * url);//start download url, return 0 if success
+int download_stat(download_stat_t *stat);
+int download_stop(void);
 #ifdef __cplusplus
 }
 #endif

@@ -198,7 +198,7 @@ httpc_free_state(httpc_state_t* req)
 }
 
 /** Close the connection: call finished callback and free the state */
-static err_t
+err_t
 httpc_close(httpc_state_t* req, httpc_result_t result, u32_t server_response, err_t err)
 {
   if (req != NULL) {
@@ -516,7 +516,8 @@ httpc_create_request_string(const httpc_connection_t *settings, const char* serv
     return snprintf(buffer, buffer_size, HTTPC_REQ_11_FORMAT(uri));
   }
 }
-char header_buf[512];
+#define MAX_HEDER_LEN 1024
+static char header_buf[MAX_HEDER_LEN];
 /** Initialize the connection struct */
 static err_t
 httpc_init_connection_common(httpc_state_t **connection, const httpc_connection_t *settings, const char* server_name,
@@ -533,9 +534,9 @@ httpc_init_connection_common(httpc_state_t **connection, const httpc_connection_
   LWIP_ASSERT("uri != NULL", uri != NULL);
 
   /* get request len */
-  req_len = httpc_create_request_string(settings, server_name, server_port, uri, use_host, header_buf, 512);
+  req_len = httpc_create_request_string(settings, server_name, server_port, uri, use_host, header_buf, MAX_HEDER_LEN);
   printf("httpc_create_request_string req_len = %d\r\n", req_len);
-  if ((req_len < 0) || (req_len > 0xFFFF)) {
+  if ((req_len < 0) || (req_len >= MAX_HEDER_LEN)) {
     return ERR_VAL;
   }
   /* alloc state and request in one block */

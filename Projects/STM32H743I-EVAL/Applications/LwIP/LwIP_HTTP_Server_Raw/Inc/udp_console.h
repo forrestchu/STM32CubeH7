@@ -21,15 +21,17 @@
 #define __UDP_CONSOLE_H__
 #include <stdio.h>
 #include <stdarg.h>
+#include "lwip/pbuf.h"
+#include "lwip/udp.h"
+#include "lwip/tcp.h"
+#include "lwip/def.h"
 /* Includes ------------------------------------------------------------------*/
 /* Exported types ------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */
-void udp_console_connect(void);
-void udp_console_send(void);
-void udp_console_printf(char * format, ...);
-
+void udp_console_init(void);
+err_t udp_console_send(struct pbuf *p);
 #endif /* __UDP_CONSOLE_H__ */
 
 

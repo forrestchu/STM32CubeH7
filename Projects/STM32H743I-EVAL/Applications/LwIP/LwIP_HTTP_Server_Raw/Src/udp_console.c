@@ -21,127 +21,124 @@
 #include "lwip/pbuf.h"
 #include "lwip/udp.h"
 #include "lwip/tcp.h"
+#include "lwip/def.h"
 #include <string.h>
 #include <stdio.h>
+
 #include "udp_console.h"
-
-/* Private typedef -----------------------------------------------------------*/
-/* Private define ------------------------------------------------------------*/
-/* Private macro -------------------------------------------------------------*/
-/* Private variables ---------------------------------------------------------*/
-/* Private function prototypes -----------------------------------------------*/
-void udp_receive_callback(void *arg, struct udp_pcb *upcb, struct pbuf *p, const ip_addr_t *addr, u16_t port);
-
-u8_t   data[100];
-__IO uint32_t message_count = 0;
-struct udp_pcb *upcb = NULL;
-
-
-/* Private functions ---------------------------------------------------------*/
-
-/**
-  * @brief  Connect to UDP echo server
-  * @param  None
-  * @retval None
-  */
-void udp_console_connect(void)
+#include "httpc_loader.h"
+void on_data(void *arg, struct udp_pcb *upcb, struct pbuf *p, const ip_addr_t *addr, u16_t port);
+static struct udp_pcb *local_pcb = NULL;
+static ip_addr_t re_addr = {0};
+static u16_t re_port = 0;
+void udp_console_init(void)
 {
-  ip_addr_t DestIPaddr;
-  err_t err;
-  
-  /* Create a new UDP control block  */
-  upcb = udp_new();
-  
-  if (upcb!=NULL)
-  {
-    /*assign destination IP address */
-    IP4_ADDR( &DestIPaddr, DEST_IP_ADDR0, DEST_IP_ADDR1, DEST_IP_ADDR2, DEST_IP_ADDR3 );
+    struct udp_pcb *upcb;
+    err_t err;
     
-    /* configure destination IP address and port */
-    err= udp_connect(upcb, &DestIPaddr, UDP_SERVER_PORT);
+    /* Create a new UDP control block  */
+    upcb = udp_new();
     
-    if (err == ERR_OK)
+    if (upcb)
     {
-      /* Set a receive callback for the upcb */
-      udp_recv(upcb, udp_receive_callback, NULL);  
+        /* Bind the upcb to the UDP_PORT port */
+        /* Using IP_ADDR_ANY allow the upcb to be used by any local interface */
+        err = udp_bind(upcb, IP_ADDR_ANY, UDP_SERVER_PORT);
+    
+        if(err == ERR_OK)
+        {
+            /* Set a receive callback for the upcb */
+            udp_recv(upcb, on_data, NULL);
+        }else{
+            udp_remove(upcb);
+        }
     }
-  }
+    local_pcb = upcb;
 }
 
-/**
-  * @brief This function is called when an UDP datagrm has been received on the port UDP_PORT.
-  * @param arg user supplied argument (udp_pcb.recv_arg)
-  * @param pcb the udp_pcb which received data
-  * @param p the packet buffer that was received
-  * @param addr the remote IP address from which the packet was received
-  * @param port the remote port from which the packet was received
-  * @retval None
-  */
-void udp_console_send(void)
+#define CMD_START "start "
+#define CMD_STAT  "stat"
+#define CMD_STOP  "stop"
+#define BUFFER_LEN  1024
+
+void udp_console_printf(struct udp_pcb *upcb, const ip_addr_t *addr, u16_t port, char * format, ...)
 {
-  struct pbuf *p;
-  
-  sprintf((char*)data, "sending udp client message %d", (int)message_count);
-  
-  /* allocate pbuf from pool*/
-  p = pbuf_alloc(PBUF_TRANSPORT,strlen((char*)data), PBUF_RAM);
-  
-  if (p != NULL)
-  {
-    /* copy data to pbuf */
-    pbuf_take(p, (char*)data, strlen((char*)data));
+    char buf[BUFFER_LEN] = {0};
+    struct pbuf *p;
+    va_list args;
+    int n = 0;
+    va_start(args,  format);
+    n = vsprintf((char *)buf, format, args);//take care of the length, we have no check here!
+    va_end(args);
     
-    /* send udp data */
-    udp_send(upcb, p); 
+    /* allocate pbuf from pool*/
+    p = pbuf_alloc(PBUF_TRANSPORT, n, PBUF_RAM);
     
-    /* free pbuf */
-    pbuf_free(p);
-  }
+    if (p != NULL)
+    {
+        /* copy data to pbuf */
+        pbuf_take(p,  buf, n);
+        udp_sendto(upcb, p, addr, port);
+    
+        /* free pbuf */
+        pbuf_free(p);
+    }
 }
 
-/**
-  * @brief This function is called when an UDP datagrm has been received on the port UDP_PORT.
-  * @param arg user supplied argument (udp_pcb.recv_arg)
-  * @param pcb the udp_pcb which received data
-  * @param p the packet buffer that was received
-  * @param addr the remote IP address from which the packet was received
-  * @param port the remote port from which the packet was received
-  * @retval None
-  */
-void udp_receive_callback(void *arg, struct udp_pcb *upcb, struct pbuf *p, const ip_addr_t *addr, u16_t port)
+void on_data(void *arg, struct udp_pcb *upcb, struct pbuf *p, const ip_addr_t *addr, u16_t port)
 {
-  /*increment message count */
-  message_count++;
-
-  udp_sendto(upcb, p, addr, port);
-  
-  /* Free receive pbuf */
-  pbuf_free(p);
-}
-
-void udp_console_printf(char * format, ...){
-  struct pbuf *p;
-  va_list args;
-  char mydata[100];
-  int n = 0;
-  va_start(args,  format);
-  n = vsprintf((char *)mydata, format, args);
-  va_end(args);
-
- 	
-  /* allocate pbuf from pool*/
-  p = pbuf_alloc(PBUF_TRANSPORT, n, PBUF_RAM);
-  
-  if (p != NULL)
-  {
-    /* copy data to pbuf */
-    pbuf_take(p,  mydata, n);
+    int i = 0, j = 0, ret = 0;
+    char url[BUFFER_LEN] = {0};
+    download_stat_t stat = {0};
+    char *data = (char *)p->payload;
+    if(strncmp(data, CMD_START, strlen(CMD_START)) == 0){
+        i += strlen(CMD_START);
+        while(data[i] == ' ') i++;
+        
+        while(i < p->len){
+            url[j++] = data[i++];
+            if(j >= BUFFER_LEN){
+						    printf("error: url toooo long, plz check\r\n");
+						    break;
+            }
+        }
+        
+        ret = download_start(url);
+        printf("start: ret=%d\r\n", ret);
+        if(ret == 0){
+            re_addr = *addr;
+            re_port = port;
+            //ret= udp_connect(upcb, addr, port);
+            //printf("start: udp_connect ret =%d\r\n", ret);
+        }
+        //udp_console_printf(upcb, addr, port, "start: ret=%d\r\n", ret);
+    }else if(strncmp(p->payload, CMD_STAT, strlen(CMD_STAT)) == 0){
+        ret = download_stat(&stat);
+        if(ret < 0){
+            //udp_console_printf(upcb, addr, port, "stat: not found or finished, ret=%d\r\n", ret);
+            printf("stat: not found or finished, ret=%d\r\n", ret);
+        }else{
+            if(stat.total_len == 0){
+                //udp_console_printf(upcb, addr, port, "stat: not connected\r\n");
+                printf("stat: not connected\r\n");
+            }else{
+                
+                //udp_console_printf(upcb, addr, port, "stat: %u/%u, speed=%u B/s\r\n", stat.recved_len, stat.total_len, stat.speed);
+                printf("stat: %u/%u, speed=%u B/s\r\n", stat.recved_len, stat.total_len, stat.speed);
+            }
+        }
+    }else if(strncmp(p->payload, CMD_STOP, strlen(CMD_STOP)) == 0){
+        ret = download_stop();
+        //udp_console_printf(upcb, addr, port, "stop: ret=%d\r\n", ret);
+        printf("stop: ret=%d\r\n", ret);
+    }else{
+        //udp_console_printf(upcb, addr, port, "Commond Unknown!\r\n");
+        printf("Commond Unknown!\r\n");
+    }
     
-    /* send udp data */
-    udp_send(upcb, p); 
-    
-    /* free pbuf */
     pbuf_free(p);
-  }
 }
 
+err_t udp_console_send(struct pbuf *p){
+    return udp_sendto(local_pcb,  p, &re_addr, re_port); 
+}

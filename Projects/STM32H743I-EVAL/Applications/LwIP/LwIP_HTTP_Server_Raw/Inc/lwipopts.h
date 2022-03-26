@@ -96,7 +96,7 @@ a lot of data that needs to be copied, this should be set high. */
 #define MEMP_NUM_TCP_SEG    TCP_SND_QUEUELEN
 
 /* TCP receive window. */
-#define TCP_WND                (16*TCP_MSS)
+#define TCP_WND                (24*TCP_MSS)
 
 #define LWIP_TCP_KEEPALIVE         1
 #define TCP_KEEPIDLE_DEFAULT     15000

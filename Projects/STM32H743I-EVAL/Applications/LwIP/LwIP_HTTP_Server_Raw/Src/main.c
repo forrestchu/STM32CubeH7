@@ -101,10 +101,8 @@ int main(void)
   /* Http webserver Init */
   http_server_init();
 
-  udp_console_connect();
+  udp_console_init();
   
-  start_download("http://commonuser-1256223703.cos.ap-beijing.myqcloud.com/bs/mtlun001/eee.mp4");
-
   /* Infinite loop */
   while (1)
   {
