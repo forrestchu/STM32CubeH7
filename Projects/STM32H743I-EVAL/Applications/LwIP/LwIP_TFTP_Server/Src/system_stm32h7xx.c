@@ -48,7 +48,7 @@
 #include <math.h>
 
 #if !defined  (HSE_VALUE)
-#define HSE_VALUE    ((uint32_t)25000000) /*!< Value of the External oscillator in Hz */
+  #define HSE_VALUE    ((uint32_t)8000000) /*!< Value of the External oscillator in Hz */
 #endif /* HSE_VALUE */
 
 #if !defined  (CSI_VALUE)
@@ -206,7 +206,7 @@ void SystemInit (void)
   {
     /* if stm32h7 revY*/
     /* Change  the switch matrix read issuing capability to 1 for the AXI SRAM target (Target 7) */
-    *((__IO uint32_t*)0x51008108) = 0x00000001U;
+    *((__IO uint32_t*)0x51008108) = 0x000000001U;
   }
 
 #if defined (DATA_IN_D2_SRAM)

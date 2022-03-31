@@ -32,6 +32,7 @@
 #include "main.h"
 #include "app_ethernet.h"
 #include "tftpserver.h"
+#include "udp_console.h"
 #ifdef USE_LCD
 #include "lcd_trace.h"
 #endif
@@ -41,6 +42,8 @@
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 struct netif gnetif;
+/* UART handler declaration */
+UART_HandleTypeDef UartHandle;
 
 FATFS SD_FatFs;  /* File system object for SD card logical drive */
 char SD_Path[4]; /* SD card logical drive path */
@@ -50,7 +53,16 @@ static void SystemClock_Config(void);
 static void BSP_Config(void);
 static void Netif_Config(void);
 static void MPU_Config(void);
+#ifdef __GNUC__
+/* With GCC/RAISONANCE, small printf (option LD Linker->Libraries->Small printf
+   set to 'Yes') calls __io_putchar() */
+#define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
+#else
+#define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
+#endif /* __GNUC__ */
+static void SystemClock_Config(void);
 static void CPU_CACHE_Enable(void);
+static void UART_Init(void);
 
 /* Private functions ---------------------------------------------------------*/
 
@@ -77,6 +89,9 @@ int main(void)
   /* Configure the system clock to 400 MHz */
   SystemClock_Config();
 
+  UART_Init();
+  
+  printf("** Test UART Printf successfully. ** \n\r");
   /* Configure the LCD, LEDs, ...*/
   BSP_Config();
 
@@ -86,15 +101,17 @@ int main(void)
   /* Configure the Network interface */
   Netif_Config();
 
-  /* Initialize the TFTP server */
-  tftpd_init();
-
+  udp_console_init();
   /* Link the SD Card disk I/O driver */
   if(FATFS_LinkDriver(&SD_Driver, SD_Path) != 0)
+ // if(SD_Init() != 0)
   {
+    printf("** SD_Init error. ** \n\r");
     while(1);
   }
 
+  /* Initialize the TFTP server */
+  tftpd_init();
   /* Infinite loop */
   while (1)
   {
@@ -114,10 +131,44 @@ int main(void)
 #endif
   }
 }
+void UART_Init(void)
+{
+  /*##-1- Configure the UART peripheral ######################################*/
+  /* Put the USART peripheral in the Asynchronous mode (UART Mode) */
+  /* UART configured as follows:
+      - Word Length = 8 Bits (7 data bit + 1 parity bit) : 
+                      BE CAREFUL : Program 7 data bits + 1 parity bit in PC HyperTerminal
+      - Stop Bit    = One Stop bit
+      - Parity      = ODD parity
+      - BaudRate    = 9600 baud
+      - Hardware flow control disabled (RTS and CTS signals) */
+  UartHandle.Instance        = USARTx;
 
+  UartHandle.Init.BaudRate   = 115200;
+  UartHandle.Init.WordLength = UART_WORDLENGTH_8B;
+  UartHandle.Init.StopBits   = UART_STOPBITS_1;
+  UartHandle.Init.Parity     = UART_PARITY_NONE;
+  UartHandle.Init.HwFlowCtl  = UART_HWCONTROL_NONE;
+  UartHandle.Init.Mode       = UART_MODE_TX_RX;
+  UartHandle.Init.OverSampling = UART_OVERSAMPLING_16;
+  UartHandle.AdvancedInit.AdvFeatureInit= UART_ADVFEATURE_NO_INIT;
+
+  if(HAL_UART_DeInit(&UartHandle) != HAL_OK)
+  {
+    /* Initialization Error */
+    //Error_Handler();
+  }
+  if(HAL_UART_Init(&UartHandle) != HAL_OK)
+  {
+    /* Initialization Error */
+    //Error_Handler();
+  }
+
+}
 static void BSP_Config(void)
 {
-  BSP_SD_Init(0);
+  int32_t ret = BSP_SD_Init(0);
+  printf("BSP_SD_Init ret=%d\r\n", ret);
 
 #ifdef USE_LCD
 
@@ -135,11 +186,24 @@ static void BSP_Config(void)
   LCD_UsrTrace("  State: Ethernet Initialization ...\n");
 
 #else
-  BSP_LED_Init(LED1);
-  BSP_LED_Init(LED2);
+  //BSP_LED_Init(LED1);
+  //BSP_LED_Init(LED2);
 #endif
 }
 
+/**
+  * @brief  Retargets the C library printf function to the USART.
+  * @param  None
+  * @retval None
+  */
+PUTCHAR_PROTOTYPE
+{
+  /* Place your implementation of fputc here */
+  /* e.g. write a character to the USART1 and Loop until the end of transmission */
+  HAL_UART_Transmit(&UartHandle, (uint8_t *)&ch, 1, 0xFFFF);
+
+  return ch;
+}
 /**
   * @brief  Setup the network interface
   * @param  None
@@ -150,6 +214,7 @@ static void Netif_Config(void)
   ip_addr_t ipaddr;
   ip_addr_t netmask;
   ip_addr_t gw;
+  ip_addr_t ns;
 
 #if LWIP_DHCP
   ip_addr_set_zero_ip4(&ipaddr);
@@ -171,6 +236,17 @@ static void Netif_Config(void)
   netif_set_default(&gnetif);
 
   ethernet_link_status_updated(&gnetif);
+
+  #if LWIP_DNS
+  IP4_ADDR(&ns, 8, 8, 8, 8);
+  dns_setserver(0, &ns);
+  IP4_ADDR(&ns, 114, 114, 114, 114);
+  dns_setserver(1, &ns);
+  IP4_ADDR(&ns, 223, 5, 5, 5);
+  dns_setserver(2, &ns);
+  IP4_ADDR(&ns, 119, 29, 29, 29);
+  dns_setserver(3, &ns);
+  #endif
 
 #if LWIP_NETIF_LINK_CALLBACK
   netif_set_link_callback(&gnetif, ethernet_link_status_updated);
@@ -220,25 +296,25 @@ static void SystemClock_Config(void)
 
   /* Enable HSE Oscillator and activate PLL with HSE as source */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;
   RCC_OscInitStruct.HSIState = RCC_HSI_OFF;
   RCC_OscInitStruct.CSIState = RCC_CSI_OFF;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
 
-  RCC_OscInitStruct.PLL.PLLM = 5;
-  RCC_OscInitStruct.PLL.PLLN = 160;
+  RCC_OscInitStruct.PLL.PLLM = 4;
+  RCC_OscInitStruct.PLL.PLLN = 400;
   RCC_OscInitStruct.PLL.PLLFRACN = 0;
   RCC_OscInitStruct.PLL.PLLP = 2;
   RCC_OscInitStruct.PLL.PLLR = 2;
   RCC_OscInitStruct.PLL.PLLQ = 4;
 
   RCC_OscInitStruct.PLL.PLLVCOSEL = RCC_PLL1VCOWIDE;
-  RCC_OscInitStruct.PLL.PLLRGE = RCC_PLL1VCIRANGE_2;
+  RCC_OscInitStruct.PLL.PLLRGE = RCC_PLL1VCIRANGE_1;
   ret = HAL_RCC_OscConfig(&RCC_OscInitStruct);
   if(ret != HAL_OK)
   {
-    while(1){ ; }
+    while(1);
   }
 
   /* Select PLL as system clock source and configure  bus clocks dividers */
@@ -248,14 +324,14 @@ static void SystemClock_Config(void)
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.SYSCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_HCLK_DIV2;
-  RCC_ClkInitStruct.APB3CLKDivider = RCC_APB3_DIV2;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_APB1_DIV2;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_APB2_DIV2;
-  RCC_ClkInitStruct.APB4CLKDivider = RCC_APB4_DIV2;
+  RCC_ClkInitStruct.APB3CLKDivider = RCC_APB3_DIV2;  
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_APB1_DIV2; 
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_APB2_DIV2; 
+  RCC_ClkInitStruct.APB4CLKDivider = RCC_APB4_DIV2; 
   ret = HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_4);
   if(ret != HAL_OK)
   {
-    while(1){ ; }
+    while(1);
   }
 
   /*activate CSI clock mondatory for I/O Compensation Cell*/
@@ -314,7 +390,7 @@ static void MPU_Config(void)
   /* Configure the MPU attributes as Normal Non Cacheable
      for LwIP RAM heap which contains the Tx buffers */
   MPU_InitStruct.Enable = MPU_REGION_ENABLE;
-  MPU_InitStruct.BaseAddress = 0x30004000;
+  MPU_InitStruct.BaseAddress = 0x30010000;
   MPU_InitStruct.Size = MPU_REGION_SIZE_16KB;
   MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
   MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;

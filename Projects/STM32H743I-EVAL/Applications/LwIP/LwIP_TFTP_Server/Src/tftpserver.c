@@ -515,7 +515,7 @@ void process_tftp_request(struct pbuf *pkt_buf, const ip_addr_t *addr, u16_t por
   char FileName[30];
   struct udp_pcb *upcb;
   err_t err;
-
+  printf("new process_tftp_request\r\n");
   /* create new UDP PCB structure */
   upcb = udp_new();
   if (!upcb)
@@ -560,16 +560,18 @@ void process_tftp_request(struct pbuf *pkt_buf, const ip_addr_t *addr, u16_t por
     {
       /* Read the name of the file asked by the client to be received and written in the SD card */
       tftp_extract_filename(FileName, pkt_buf->payload);
-  
+      printf(" tftp_extract_filename :%s\r\n", FileName);
       /* Could not open filesystem */
       if(f_mount(&filesystem, (TCHAR const*)"", 0) != FR_OK)
       {
+        printf(" f_mount error\r\n");
         return;
       }
         
       /* If Could not open the selected directory */
       if (f_opendir(&dir_2, "/") != FR_OK)
       {
+        printf(" f_opendir error\r\n");
         return;
       }
         
