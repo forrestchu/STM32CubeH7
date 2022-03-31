@@ -30,8 +30,9 @@
 #include "stm32h743i_eval_sdram.h"
 
 /* FatFs includes component */
-#include "ff_gen_drv.h"
-#include "sd_diskio.h"
+//#include "ff_gen_drv.h"
+//#include "sd_diskio.h"
+#include "diskio.h"
 
 /* Exported types ------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/

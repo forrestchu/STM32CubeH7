@@ -33,6 +33,7 @@
 #include "app_ethernet.h"
 #include "tftpserver.h"
 #include "udp_console.h"
+#include "ff.h"
 #ifdef USE_LCD
 #include "lcd_trace.h"
 #endif
@@ -103,8 +104,8 @@ int main(void)
 
   udp_console_init();
   /* Link the SD Card disk I/O driver */
-  if(FATFS_LinkDriver(&SD_Driver, SD_Path) != 0)
- // if(SD_Init() != 0)
+  //if(FATFS_LinkDriver(&SD_Driver, SD_Path) != 0)
+  if(SD_Init() != 0)
   {
     printf("** SD_Init error. ** \n\r");
     while(1);
@@ -167,8 +168,8 @@ void UART_Init(void)
 }
 static void BSP_Config(void)
 {
-  int32_t ret = BSP_SD_Init(0);
-  printf("BSP_SD_Init ret=%d\r\n", ret);
+  //int32_t ret = BSP_SD_Init(0);
+  //printf("BSP_SD_Init ret=%d\r\n", ret);
 
 #ifdef USE_LCD
 
