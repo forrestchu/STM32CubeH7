@@ -69,7 +69,7 @@
 
 /** Set this to 1 to keep server name and uri in request state */
 #ifndef HTTPC_DEBUG_REQUEST
-#define HTTPC_DEBUG_REQUEST         0
+#define HTTPC_DEBUG_REQUEST         1
 #endif
 
 /** This string is passed in the HTTP header as "User-Agent: " */
@@ -202,6 +202,9 @@ err_t
 httpc_close(httpc_state_t* req, httpc_result_t result, u32_t server_response, err_t err)
 {
   if (req != NULL) {
+    //cancel all dns reqs
+    dns_cancel_pending(req->server_name, req);
+
     if (req->conn_settings != NULL) {
       if (req->conn_settings->result_fn != NULL) {
         req->conn_settings->result_fn(req->callback_arg, result, req->rx_content_len, server_response, err);
@@ -410,7 +413,6 @@ httpc_tcp_connected(void *arg, struct altcp_pcb *pcb, err_t err)
   httpc_state_t* req = (httpc_state_t*)arg;
   LWIP_UNUSED_ARG(pcb);
   LWIP_UNUSED_ARG(err);
-
   /* send request; last char is zero termination */
   r = altcp_write(req->pcb, req->request->payload, req->request->len - 1, TCP_WRITE_FLAG_COPY);
   if (r != ERR_OK) {

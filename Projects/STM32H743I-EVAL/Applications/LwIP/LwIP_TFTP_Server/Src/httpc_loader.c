@@ -25,11 +25,17 @@
 #include "lwip/timeouts.h"
 #include "httpc_loader.h"
 #include "udp_console.h"
+#include "ff.h"
 #include <string.h>
 #include <stdlib.h>
 
 #define MAX_HOST_LEN 128
 #define MAX_URI_LEN 512
+#define MAX_NAME_LEN 128
+//#define MAX_MAX_CACHE_LEN (512-64)*1024
+//#define CACHE_ADDR 0x24000000
+#define MAX_MAX_CACHE_LEN (128-10)*1024
+#define CACHE_ADDR 0x30020000
 #define HTTP_PREFIX "http://"
 #define HTTPS_PREFIX "https://"
 #define ACCEPT_RANGES "Accept-Ranges:"
@@ -37,16 +43,23 @@
 typedef struct loader_worker{
     httpc_connection_t conn_settings;
     httpc_state_t *conn_state;
+    FATFS fs;
+    DIR dir;
+    FIL fd;
+    uint8_t *cache_data;
     char host[MAX_HOST_LEN];
     char uri[MAX_URI_LEN];
+    char filename[MAX_NAME_LEN];
     uint32_t total_len;
     uint32_t recved_len;
     uint32_t start_time;
     uint32_t conn_start_time;
     uint32_t conn_id;
+    uint32_t cache_len;
     uint8_t worker_id;
     uint8_t support_range;
     uint8_t is_cancelled;
+    uint8_t fd_valid;
 }loader_worker_t;
 
 typedef struct loader_mgt{
@@ -56,6 +69,9 @@ typedef struct loader_mgt{
 }loader_mgt_t;
 
 void worker_restart(loader_worker_t *worker);
+void worker_open_file(loader_worker_t *worker);
+void worker_close_file(loader_worker_t *worker);
+void worker_write_file(loader_worker_t *worker, uint8_t *data, uint32_t len);
 extern u32_t sys_now(void);
 err_t httpc_close(httpc_state_t* req, httpc_result_t result, u32_t server_response, err_t err);
 
@@ -66,9 +82,9 @@ loader_mgt_t *get_mgr_singleton(){
     return &g_mgr;
 }
 
-int get_host_and_uri(char *url, char *host, char *uri)
+int get_host_and_uri(char *url, char *host, char *uri, char *fn)
 {
-    int h_len = 0, u_len = 0, url_idx = 0;
+    int h_len = 0, u_len = 0, f_len = 0, url_idx = 0, last = 0;
     int url_len = strlen(url);
     
     if(!url_len || !host || !uri){
@@ -88,6 +104,10 @@ int get_host_and_uri(char *url, char *host, char *uri)
     }
     
     while(url_idx < url_len){
+        if(url[url_idx] == '/'){
+            last = url_idx;
+        }
+        
         if(u_len >= MAX_URI_LEN || h_len >= MAX_HOST_LEN){
             return -4;
         }
@@ -107,6 +127,17 @@ int get_host_and_uri(char *url, char *host, char *uri)
     
     uri[u_len] = 0;
     host[h_len] = 0;
+    
+    if(last > 0 && last < url_len - 1){
+        last++;
+        while(last < url_len){
+            fn[f_len++] = url[last++];
+            if(f_len >= MAX_NAME_LEN) return -5;
+        }
+        
+        fn[f_len] = 0;
+    }
+    
     return 0;
 }
 
@@ -140,6 +171,7 @@ void on_httpc_finish(void *arg, httpc_result_t httpc_result, u32_t rx_content_le
     worker->conn_state = NULL;
     if(is_finished){
         printf("download stop code[%d], %u/%u, spent=%ums\r\n", is_finished, worker->recved_len, worker->total_len, time_span(worker->start_time));
+        worker_close_file(worker);
         get_mgr_singleton()->is_running = 0;
     }else{
         sys_timeout(3000, worker_restart, worker);
@@ -160,7 +192,7 @@ void on_httpc_finish(void *arg, httpc_result_t httpc_result, u32_t rx_content_le
 err_t on_httpc_headers(httpc_state_t *connection, void *arg, struct pbuf *hdr, u16_t hdr_len, u32_t content_len){
     loader_worker_t *worker = (loader_worker_t *)arg;
     printf("header recved, content len=%d\r\n", content_len);
-    if(0xFFFFFFFF == content_len){//-1, there is no content-length in header
+    if(0xFFFFFFFF == content_len || 0 == content_len){//-1, there is no content-length in header
         worker->is_cancelled = 1;
         printf("abort, no content-length in header\r\n");
         return ERR_ARG;
@@ -173,6 +205,8 @@ err_t on_httpc_headers(httpc_state_t *connection, void *arg, struct pbuf *hdr, u
             printf("header: range supported\r\n");
             worker->support_range = 1;
         }
+        
+        worker_open_file(worker);
     }
     
     worker->conn_start_time = sys_now();
@@ -181,6 +215,7 @@ err_t on_httpc_headers(httpc_state_t *connection, void *arg, struct pbuf *hdr, u
 
 err_t on_httpc_data(void *arg, struct altcp_pcb *conn, struct pbuf *p, err_t err){
     err_t ret = ERR_OK;
+    struct pbuf *q = NULL;
     loader_worker_t *worker = (loader_worker_t *)arg;
     if(!p){
         printf("peer conn closed\r\n");
@@ -188,13 +223,19 @@ err_t on_httpc_data(void *arg, struct altcp_pcb *conn, struct pbuf *p, err_t err
     }else{
         //printf("recv len=%d\r\n", p->tot_len);
         if(p->tot_len != p->len){
-            printf("recv first node len=%d\r\n", p->len);
+            //printf("recv first node len=%d\r\n", p->len);
         }
-
-        ret = udp_console_send(p);
-        if(ret != ERR_OK){
-            printf("udp_console_send err=%d\r\n", ret);
-        }
+        
+        q = p;
+       while(q){
+            worker_write_file(worker, (uint8_t *)q->payload, q->len);
+            q = q->next;
+       }
+        
+        //ret = udp_console_send(p);
+        //if(ret != ERR_OK){
+        //    printf("udp_console_send err=%d\r\n", ret);
+        //}
         worker->recved_len += p->tot_len;
         altcp_recved(conn, p->tot_len);
         //printf("[%u-%u]:%u->%u/%u\r\n", worker->worker_id, worker->conn_id, p->tot_len, worker->recved_len, worker->total_len);
@@ -207,6 +248,7 @@ err_t on_httpc_data(void *arg, struct altcp_pcb *conn, struct pbuf *p, err_t err
 loader_worker_t *worker_new(){
     //currently only support one worker
     memset(&g_worker, 0, sizeof(loader_worker_t));
+    g_worker.cache_data = (uint8_t*)CACHE_ADDR;
     return &g_worker;
 }
 void worker_free(loader_worker_t *worker){
@@ -264,6 +306,101 @@ void worker_stop(loader_worker_t *worker){
     printf("stopped by user\r\n");
 }
 
+void worker_open_file(loader_worker_t *worker){
+    
+    if(strlen(worker->filename) <= 0){
+        printf("file name empty\r\n");
+        return;
+    }
+    
+    if(worker->fd_valid){
+        printf("file already openned\r\n");
+        return;
+    }
+    
+    if(f_mount(&worker->fs, (TCHAR const*)"", 0) != FR_OK)
+    {
+        printf("f_mount error\r\n");
+        return;
+    }
+    
+    if (f_opendir(&worker->dir, "/") != FR_OK)
+    {
+        f_mount(NULL, (TCHAR const*)"",0);
+        printf("f_opendir error\r\n");
+        return;
+    }
+    
+    if (f_open(&worker->fd, (const TCHAR*)worker->filename, FA_CREATE_ALWAYS|FA_WRITE) != FR_OK)
+    {
+        printf("f_open error\r\n");
+        f_mount(NULL, (TCHAR const*)"",0);
+        return;
+    }
+  
+    worker->fd_valid = 1;
+}
+
+void worker_close_file(loader_worker_t *worker){
+    uint32_t n = 0;
+    if(!worker->fd_valid){
+        printf("file not openned\r\n");
+        return;
+    }
+
+    //save remaining data
+    if(worker->cache_len > 0){
+        f_write(&worker->fd, worker->cache_data, worker->cache_len, (UINT*)&n);
+        if(worker->cache_len != n){
+            printf("file flush error, %u/%u\r\n", n, worker->cache_len);
+        }
+        
+        worker->cache_len = 0;
+    }
+
+    if (f_close(&worker->fd) != FR_OK)
+    {
+        printf("wanning: f_close error\r\n");
+    }
+    
+    if (f_mount(NULL, (TCHAR const*)"",0) != FR_OK)
+    {
+        printf("wanning: unmount error\r\n");
+    }
+  
+    worker->fd_valid = 0;
+}
+
+void worker_write_file(loader_worker_t *worker, uint8_t *data, uint32_t len){
+    uint32_t index = 0;
+    uint32_t n = 0;
+    if(!worker->fd_valid){
+        printf("file not openned, [%d] dropped\r\n", len);
+        return;
+    }
+    
+    if(len > MAX_MAX_CACHE_LEN){
+        printf("data too long, [%d] dropped\r\n", len);
+        return;
+    }
+
+    while(index < len){
+        worker->cache_data[worker->cache_len] = data[index];
+        index++;
+        worker->cache_len++;
+    }
+    
+    if(worker->cache_len >= MAX_MAX_CACHE_LEN){
+        f_write(&worker->fd, worker->cache_data, worker->cache_len, (UINT*)&n);
+        if(worker->cache_len != n){
+            printf("file write error, %u/%u\r\n", n, worker->cache_len);
+        }
+        
+        worker->cache_len = 0;
+    }
+
+}
+
 int download_start(char * url)
 {
     int ret = 0;
@@ -275,9 +412,9 @@ int download_start(char * url)
     }
     
     loader_worker_t *worker = worker_new();
-    ret = get_host_and_uri(url, worker->host, worker->uri);
-    if(ret < 0 || !strlen(worker->host) || !strlen(worker->uri)){
-        printf("get host and url error,url=%s\r\n", url);
+    ret = get_host_and_uri(url, worker->host, worker->uri, worker->filename);
+    if(ret < 0 || !strlen(worker->host) || !strlen(worker->uri)|| !strlen(worker->filename)){
+        printf("get host or url or filename error,ret=%d, url=%s\r\n", ret, url);
         worker_free(worker);
         return -2;
     }

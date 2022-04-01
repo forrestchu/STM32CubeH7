@@ -631,6 +631,27 @@ dns_lookup(const char *name, ip_addr_t *addr LWIP_DNS_ADDRTYPE_ARG(u8_t dns_addr
   return ERR_ARG;
 }
 
+err_t dns_cancel_pending(const char *name, void *callback_arg)
+{
+  u8_t i, r;
+
+  /* Walk through name list, return entry if found. If not, return NULL. */
+  for (i = 0; i < DNS_TABLE_SIZE; ++i) {
+    if ((dns_table[i].state == DNS_STATE_ASKING) &&
+        (lwip_strnicmp(name, dns_table[i].name, sizeof(dns_table[i].name)) == 0)) {
+      for (r = 0; r < DNS_MAX_REQUESTS; r++) {
+        if (callback_arg && dns_requests[r].arg == callback_arg) {
+          dns_requests[r].found = 0;
+          dns_requests[r].arg = 0;
+          LWIP_DEBUGF(DNS_DEBUG, ("dns_cancel_pending: \"%s\": cancel one\n", name));
+        }//if
+      }//for r
+    }//if
+  }//for i
+  
+  return ERR_OK;
+}
+
 /**
  * Compare the "dotted" name "query" with the encoded name "response"
  * to make sure an answer from the DNS server matches the current dns_table

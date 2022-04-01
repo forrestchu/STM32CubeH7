@@ -107,7 +107,7 @@ int main(void)
   //if(FATFS_LinkDriver(&SD_Driver, SD_Path) != 0)
   if(SD_Init() != 0)
   {
-    printf("** SD_Init error. ** \n\r");
+    printf("** SD_Init error. Plz check and reset** \n\r");
     while(1);
   }
 
