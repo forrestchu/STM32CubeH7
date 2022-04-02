@@ -32,10 +32,10 @@
 #define MAX_HOST_LEN 128
 #define MAX_URI_LEN 512
 #define MAX_NAME_LEN 128
-//#define MAX_MAX_CACHE_LEN (512-64)*1024
-//#define CACHE_ADDR 0x24000000
-#define MAX_MAX_CACHE_LEN (128-10)*1024
-#define CACHE_ADDR 0x30020000
+#define MAX_MAX_CACHE_LEN (512 - 6)*1024
+#define CACHE_ADDR 0x24000000
+//#define MAX_MAX_CACHE_LEN (128-10)*1024
+//#define CACHE_ADDR 0x30020000
 #define HTTP_PREFIX "http://"
 #define HTTPS_PREFIX "https://"
 #define ACCEPT_RANGES "Accept-Ranges:"
@@ -80,6 +80,10 @@ loader_worker_t g_worker = {0};
 
 loader_mgt_t *get_mgr_singleton(){
     return &g_mgr;
+}
+
+void mgr_release(loader_mgt_t * mgr){
+    mgr->is_running = 0;
 }
 
 int get_host_and_uri(char *url, char *host, char *uri, char *fn)
@@ -172,7 +176,7 @@ void on_httpc_finish(void *arg, httpc_result_t httpc_result, u32_t rx_content_le
     if(is_finished){
         printf("download stop code[%d], %u/%u, spent=%ums\r\n", is_finished, worker->recved_len, worker->total_len, time_span(worker->start_time));
         worker_close_file(worker);
-        get_mgr_singleton()->is_running = 0;
+        mgr_release(get_mgr_singleton());
     }else{
         sys_timeout(3000, worker_restart, worker);
     }
@@ -222,9 +226,9 @@ err_t on_httpc_data(void *arg, struct altcp_pcb *conn, struct pbuf *p, err_t err
         altcp_close(conn);
     }else{
         //printf("recv len=%d\r\n", p->tot_len);
-        if(p->tot_len != p->len){
+        //if(p->tot_len != p->len){
             //printf("recv first node len=%d\r\n", p->len);
-        }
+        //}
         
         q = p;
        while(q){
@@ -339,6 +343,9 @@ void worker_open_file(loader_worker_t *worker){
     }
   
     worker->fd_valid = 1;
+
+    //for test
+    SDMMC_Clock_Set(6);
 }
 
 void worker_close_file(loader_worker_t *worker){

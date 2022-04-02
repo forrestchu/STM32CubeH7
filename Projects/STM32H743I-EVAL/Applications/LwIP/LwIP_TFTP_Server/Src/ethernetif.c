@@ -35,7 +35,7 @@
 #define ETH_DMA_TRANSMIT_TIMEOUT                (20U)
 
 #define ETH_RX_BUFFER_SIZE            1500U
-#define ETH_RX_BUFFER_CNT             40U
+#define ETH_RX_BUFFER_CNT             80U
 #define ETH_TX_BUFFER_MAX             ((ETH_TX_DESC_CNT) * 2U)
 
 /* Private macro -------------------------------------------------------------*/

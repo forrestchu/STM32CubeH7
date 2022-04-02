@@ -391,7 +391,7 @@ static void MPU_Config(void)
   /* Configure the MPU attributes as Normal Non Cacheable
      for LwIP RAM heap which contains the Tx buffers */
   MPU_InitStruct.Enable = MPU_REGION_ENABLE;
-  MPU_InitStruct.BaseAddress = 0x30010000;
+  MPU_InitStruct.BaseAddress = 0x30020000;
   MPU_InitStruct.Size = MPU_REGION_SIZE_16KB;
   MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
   MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;

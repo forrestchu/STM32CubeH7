@@ -55,10 +55,10 @@
 
 /* MEM_SIZE: the size of the heap memory. If the application will send
 a lot of data that needs to be copied, this should be set high. */
-#define MEM_SIZE                (64*1024)
+#define MEM_SIZE                (128*1024)
 
 /* Relocate the LwIP RAM heap pointer */
-#define LWIP_RAM_HEAP_POINTER    (0x30010000)
+#define LWIP_RAM_HEAP_POINTER    (0x30020000)
 
 
 /* MEMP_NUM_TCP_PCB: the number of simulatenously active TCP
@@ -90,19 +90,22 @@ a lot of data that needs to be copied, this should be set high. */
 #define TCP_MSS                 (1500 - 40)	  /* TCP_MSS = (Ethernet MTU - IP header size - TCP header size) */
 
 /* TCP sender buffer space (bytes). */
-#define TCP_SND_BUF             (16*TCP_MSS)
+#define TCP_SND_BUF             (32*TCP_MSS)
 /* MEMP_NUM_TCP_SEG: the number of simultaneously queued TCP
    segments. */
 #define MEMP_NUM_TCP_SEG    TCP_SND_QUEUELEN
 
 /* TCP receive window. */
-#define TCP_WND                (24*TCP_MSS)
+#define TCP_WND                (40*TCP_MSS)
 
 #define LWIP_TCP_KEEPALIVE         1
 #define TCP_KEEPIDLE_DEFAULT     15000
 #define TCP_KEEPINTVL_DEFAULT   8000
 #define TCP_KEEPCNT_DEFAULT       4
-
+//#define LWIP_TCP_SACK_OUT          1
+//#define LWIP_TCP_MAX_SACK_NUM    8
+//#define LWIP_WND_SCALE                1
+//#define TCP_RCV_SCALE                    1
 /* ---------- ICMP options ---------- */
 #define LWIP_ICMP                       1
 
