@@ -77,6 +77,7 @@ err_t httpc_close(httpc_state_t* req, httpc_result_t result, u32_t server_respon
 
 loader_mgt_t g_mgr = {0};
 loader_worker_t g_worker = {0};
+static char file_name_prefix = 'a';//add a prefix char to file name, only for test
 
 loader_mgt_t *get_mgr_singleton(){
     return &g_mgr;
@@ -131,7 +132,8 @@ int get_host_and_uri(char *url, char *host, char *uri, char *fn)
     
     uri[u_len] = 0;
     host[h_len] = 0;
-    
+
+    fn[f_len++] = file_name_prefix++;
     if(last > 0 && last < url_len - 1){
         last++;
         while(last < url_len){
@@ -384,6 +386,8 @@ void worker_write_file(loader_worker_t *worker, uint8_t *data, uint32_t len){
     uint32_t index = 0;
     uint32_t n = 0;
     uint32_t cur_time = 0;
+    uint32_t wlen = 0, other = 0;
+    #define SECTOR_SIZE 512
     if(!worker->fd_valid){
         printf("file not openned, [%d] dropped\r\n", len);
         return;
@@ -401,13 +405,21 @@ void worker_write_file(loader_worker_t *worker, uint8_t *data, uint32_t len){
     }
     
     if(worker->cache_len >= MAX_MAX_CACHE_LEN){
+        other = worker->cache_len%SECTOR_SIZE;
+        wlen = worker->cache_len - other;
+
         cur_time = sys_now();
-        f_write(&worker->fd, worker->cache_data, worker->cache_len, (UINT*)&n);
-        if(worker->cache_len != n){
-            printf("file write error, %u/%u\r\n", n, worker->cache_len);
+        f_write(&worker->fd, worker->cache_data, wlen, (UINT*)&n);
+        if(wlen != n){
+            printf("file write error, %u/%u\r\n", n, wlen);
         }
-        printf("len=%u, time=%ums\r\n",  worker->cache_len, time_span(cur_time));
+        printf("len=%u, time=%ums\r\n",  wlen, time_span(cur_time));
+
         worker->cache_len = 0;
+        for(index = 0;index < other; index++){
+            worker->cache_data[worker->cache_len] = worker->cache_data[wlen+index];
+            worker->cache_len++;
+        }
     }
 
 }
