@@ -162,9 +162,10 @@ uint32_t time_span(uint32_t start){
  * @param err an error returned by internal lwip functions, can help to specify
  *            the source of the error but must not necessarily be != ERR_OK
  */
+static char console_buf[128];
 void on_httpc_finish(void *arg, httpc_result_t httpc_result, u32_t rx_content_len, u32_t srv_res, err_t err){
     loader_worker_t *worker = (loader_worker_t *)arg;
-    int is_finished = 0;
+    int is_finished = 0, n = 0;
     if(worker->total_len > 0 && worker->recved_len >= worker->total_len){
         is_finished += 1;
     }
@@ -176,6 +177,9 @@ void on_httpc_finish(void *arg, httpc_result_t httpc_result, u32_t rx_content_le
     printf("a conn finished, result=%d, http_code=%d, rx_content_len=%d,time=%dms\r\n", httpc_result, srv_res, rx_content_len, time_span(worker->conn_start_time));
     worker->conn_state = NULL;
     if(is_finished){
+        n = snprintf(console_buf, 128, "download stop code[%d], %u/%u, spent=%ums\r\n", is_finished, worker->recved_len, worker->total_len, time_span(worker->start_time));
+        udp_console_send(console_buf, n);
+	
         printf("download stop code[%d], %u/%u, spent=%ums\r\n", is_finished, worker->recved_len, worker->total_len, time_span(worker->start_time));
         worker_close_file(worker);
         mgr_release(get_mgr_singleton());

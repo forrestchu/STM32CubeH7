@@ -59,7 +59,7 @@ void udp_console_init(void)
 #define CMD_START "start "
 #define CMD_STAT  "stat"
 #define CMD_STOP  "stop"
-#define BUFFER_LEN  1024
+#define BUFFER_LEN  512
 
 void udp_console_printf(struct udp_pcb *upcb, const ip_addr_t *addr, u16_t port, char * format, ...)
 {
@@ -98,47 +98,65 @@ void on_data(void *arg, struct udp_pcb *upcb, struct pbuf *p, const ip_addr_t *a
         while(i < p->len){
             url[j++] = data[i++];
             if(j >= BUFFER_LEN){
-						    printf("error: url toooo long, plz check\r\n");
-						    break;
+                printf("error: url toooo long, plz check\r\n");
+                break;
             }
         }
         
         ret = download_start(url);
-        printf("start: ret=%d\r\n", ret);
+        //printf("start: ret=%d\r\n", ret);
         if(ret == 0){
             re_addr = *addr;
             re_port = port;
             //ret= udp_connect(upcb, addr, port);
             //printf("start: udp_connect ret =%d\r\n", ret);
         }
-        //udp_console_printf(upcb, addr, port, "start: ret=%d\r\n", ret);
+        udp_console_printf(upcb, addr, port, "start: ret=%d\r\n", ret);
     }else if(strncmp(p->payload, CMD_STAT, strlen(CMD_STAT)) == 0){
         ret = download_stat(&stat);
         if(ret < 0){
-            //udp_console_printf(upcb, addr, port, "stat: not found or finished, ret=%d\r\n", ret);
-            printf("stat: not found or finished, ret=%d\r\n", ret);
+            udp_console_printf(upcb, addr, port, "stat: not found or finished, ret=%d\r\n", ret);
+            //printf("stat: not found or finished, ret=%d\r\n", ret);
         }else{
             if(stat.total_len == 0){
-                //udp_console_printf(upcb, addr, port, "stat: not connected\r\n");
-                printf("stat: not connected\r\n");
+                udp_console_printf(upcb, addr, port, "stat: not connected\r\n");
+                //printf("stat: not connected\r\n");
             }else{
                 
-                //udp_console_printf(upcb, addr, port, "stat: %u/%u, speed=%u B/s\r\n", stat.recved_len, stat.total_len, stat.speed);
-                printf("stat: %u/%u, speed=%u B/s\r\n", stat.recved_len, stat.total_len, stat.speed);
+                udp_console_printf(upcb, addr, port, "stat: %u/%u, speed=%u B/s\r\n", stat.recved_len, stat.total_len, stat.speed);
+                //printf("stat: %u/%u, speed=%u B/s\r\n", stat.recved_len, stat.total_len, stat.speed);
             }
         }
     }else if(strncmp(p->payload, CMD_STOP, strlen(CMD_STOP)) == 0){
         ret = download_stop();
-        //udp_console_printf(upcb, addr, port, "stop: ret=%d\r\n", ret);
-        printf("stop: ret=%d\r\n", ret);
+        udp_console_printf(upcb, addr, port, "stop: ret=%d\r\n", ret);
+        //printf("stop: ret=%d\r\n", ret);
     }else{
-        //udp_console_printf(upcb, addr, port, "Commond Unknown!\r\n");
-        printf("Commond Unknown!\r\n");
+        udp_console_printf(upcb, addr, port, "Commond Unknown!\r\n");
+        //printf("Commond Unknown!\r\n");
     }
     
     pbuf_free(p);
 }
 
-err_t udp_console_send(struct pbuf *p){
-    return udp_sendto(local_pcb,  p, &re_addr, re_port); 
+err_t udp_console_send(char *data, int len){
+    struct pbuf *p = NULL;
+    err_t ret = ERR_OK;
+    if(data == NULL || len <= 0){
+        return ERR_ARG;
+    }
+
+    p = pbuf_alloc(PBUF_TRANSPORT, len, PBUF_RAM);
+    
+    if (p != NULL)
+    {
+        /* copy data to pbuf */
+        pbuf_take(p,  data, len);
+        ret = udp_sendto(local_pcb,  p, &re_addr, re_port); 
+    
+        /* free pbuf */
+        pbuf_free(p);
+    }
+	
+    return ret;
 }

@@ -31,7 +31,7 @@
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */
 void udp_console_init(void);
-err_t udp_console_send(struct pbuf *p);
+err_t udp_console_send(char *data, int len);
 #endif /* __UDP_CONSOLE_H__ */
 
 
