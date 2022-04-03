@@ -307,6 +307,8 @@ void worker_stop(loader_worker_t *worker){
     worker->is_cancelled = 1;
     
     if(worker->conn_state) httpc_close(worker->conn_state, HTTPC_RESULT_LOCAL_ABORT, 0, -17);
+    else sys_untimeout(worker_restart, worker);//there may be pending event, cancel it 
+
     printf("stopped by user\r\n");
 }
 
@@ -381,6 +383,7 @@ void worker_close_file(loader_worker_t *worker){
 void worker_write_file(loader_worker_t *worker, uint8_t *data, uint32_t len){
     uint32_t index = 0;
     uint32_t n = 0;
+    uint32_t cur_time = 0;
     if(!worker->fd_valid){
         printf("file not openned, [%d] dropped\r\n", len);
         return;
@@ -398,11 +401,12 @@ void worker_write_file(loader_worker_t *worker, uint8_t *data, uint32_t len){
     }
     
     if(worker->cache_len >= MAX_MAX_CACHE_LEN){
+        cur_time = sys_now();
         f_write(&worker->fd, worker->cache_data, worker->cache_len, (UINT*)&n);
         if(worker->cache_len != n){
             printf("file write error, %u/%u\r\n", n, worker->cache_len);
         }
-        
+        printf("len=%u, time=%ums\r\n",  worker->cache_len, time_span(cur_time));
         worker->cache_len = 0;
     }
 
