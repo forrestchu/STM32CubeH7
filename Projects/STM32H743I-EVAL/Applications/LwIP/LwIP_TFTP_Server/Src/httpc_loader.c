@@ -413,7 +413,8 @@ void worker_write_file(loader_worker_t *worker, uint8_t *data, uint32_t len){
         if(wlen != n){
             printf("file write error, %u/%u\r\n", n, wlen);
         }
-        printf("len=%u, time=%ums\r\n",  wlen, time_span(cur_time));
+        cur_time = time_span(cur_time);
+        if(cur_time>5) printf("sd write,l=%u,t=%ums\r\n",  wlen, cur_time);
 
         worker->cache_len = 0;
         for(index = 0;index < other; index++){
