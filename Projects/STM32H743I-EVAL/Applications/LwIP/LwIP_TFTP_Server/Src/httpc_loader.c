@@ -229,7 +229,7 @@ err_t on_httpc_data(void *arg, struct altcp_pcb *conn, struct pbuf *p, err_t err
     }else{
         //printf("recv len=%d\r\n", p->tot_len);
         //if(p->tot_len != p->len){
-            //printf("recv first node len=%d\r\n", p->len);
+            //printf("seg l=%u/%u\r\n", p->len, p->tot_len);
         //}
         
         q = p;
