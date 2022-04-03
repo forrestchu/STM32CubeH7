@@ -239,14 +239,17 @@ static void Netif_Config(void)
   ethernet_link_status_updated(&gnetif);
 
   #if LWIP_DNS
-  IP4_ADDR(&ns, 8, 8, 8, 8);
-  dns_setserver(0, &ns);
-  IP4_ADDR(&ns, 114, 114, 114, 114);
-  dns_setserver(1, &ns);
-  IP4_ADDR(&ns, 223, 5, 5, 5);
-  dns_setserver(2, &ns);
+  dns_setserver(0, &gw);//two chances for default dns server, or else we will try other public dns server
+  dns_setserver(1, &gw);
   IP4_ADDR(&ns, 119, 29, 29, 29);
+  dns_setserver(2, &ns);
+  IP4_ADDR(&ns, 8, 8, 8, 8);
   dns_setserver(3, &ns);
+  IP4_ADDR(&ns, 114, 114, 114, 114);
+  dns_setserver(4, &ns);
+  IP4_ADDR(&ns, 223, 5, 5, 5);
+  dns_setserver(5, &ns);
+  
   #endif
 
 #if LWIP_NETIF_LINK_CALLBACK

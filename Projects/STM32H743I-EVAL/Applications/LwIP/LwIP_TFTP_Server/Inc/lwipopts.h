@@ -113,7 +113,7 @@ a lot of data that needs to be copied, this should be set high. */
 /* ---------- DHCP options ---------- */
 #define LWIP_DHCP               0
 #define LWIP_DNS                1
-#define DNS_MAX_SERVERS                 4
+#define DNS_MAX_SERVERS                 6
 
 /* ---------- UDP options ---------- */
 #define LWIP_UDP                1
