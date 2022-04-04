@@ -133,7 +133,7 @@ extern "C" {
 
 #endif /* LWIP_USE_EXTERNAL_MBEDTLS */
 
-void pppcrypt_56_to_64_bit_key(u_char *key, u_char *des_key);
+//void pppcrypt_56_to_64_bit_key(u_char *key, u_char *des_key);
 
 #ifdef __cplusplus
 }

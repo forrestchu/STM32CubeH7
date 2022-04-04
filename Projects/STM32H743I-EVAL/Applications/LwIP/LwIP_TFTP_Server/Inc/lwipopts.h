@@ -137,6 +137,8 @@ The STM32H7xx allows computing and verifying the IP, UDP, TCP and ICMP checksums
 */
 #define CHECKSUM_BY_HARDWARE 
 
+#define PPP_SUPPORT     1
+#define LWIP_INCLUDED_POLARSSL_MD5       1
 
 #ifdef CHECKSUM_BY_HARDWARE
   /* CHECKSUM_GEN_IP==0: Generate checksums by hardware for outgoing IP packets.*/

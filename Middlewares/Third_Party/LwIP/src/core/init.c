@@ -370,7 +370,7 @@ lwip_init(void)
 #if LWIP_DNS
   dns_init();
 #endif /* LWIP_DNS */
-#if PPP_SUPPORT
+#if 0//PPP_SUPPORT
   ppp_init();
 #endif
 
