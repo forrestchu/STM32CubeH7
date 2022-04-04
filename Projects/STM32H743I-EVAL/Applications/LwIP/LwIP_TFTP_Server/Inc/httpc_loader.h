@@ -34,7 +34,7 @@ typedef struct download_stat{
 /* Exported constants --------------------------------------------------------*/   
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */
-int download_start(char * url);//start download url, return 0 if success
+int download_start(char * url, int enable_md5);//start download url, return 0 if success
 int download_stat(download_stat_t *stat);
 int download_stop(void);
 #ifdef __cplusplus

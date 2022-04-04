@@ -57,6 +57,7 @@ void udp_console_init(void)
 }
 
 #define CMD_START "start "
+#define CMD_STARTC "startc "
 #define CMD_STAT  "stat"
 #define CMD_STOP  "stop"
 #define BUFFER_LEN  512
@@ -103,7 +104,7 @@ void on_data(void *arg, struct udp_pcb *upcb, struct pbuf *p, const ip_addr_t *a
             }
         }
         
-        ret = download_start(url);
+        ret = download_start(url, 0);
         //printf("start: ret=%d\r\n", ret);
         if(ret == 0){
             re_addr = *addr;
@@ -112,6 +113,27 @@ void on_data(void *arg, struct udp_pcb *upcb, struct pbuf *p, const ip_addr_t *a
             //printf("start: udp_connect ret =%d\r\n", ret);
         }
         udp_console_printf(upcb, addr, port, "start: ret=%d\r\n", ret);
+    }else if(strncmp(data, CMD_STARTC, strlen(CMD_STARTC)) == 0){
+        i += strlen(CMD_STARTC);
+        while(data[i] == ' ') i++;
+        
+        while(i < p->len){
+            url[j++] = data[i++];
+            if(j >= BUFFER_LEN){
+                printf("error: url toooo long, plz check\r\n");
+                break;
+            }
+        }
+        
+        ret = download_start(url, 1);
+        //printf("start: ret=%d\r\n", ret);
+        if(ret == 0){
+            re_addr = *addr;
+            re_port = port;
+            //ret= udp_connect(upcb, addr, port);
+            //printf("start: udp_connect ret =%d\r\n", ret);
+        }
+        udp_console_printf(upcb, addr, port, "startc: ret=%d\r\n", ret);
     }else if(strncmp(p->payload, CMD_STAT, strlen(CMD_STAT)) == 0){
         ret = download_stat(&stat);
         if(ret < 0){

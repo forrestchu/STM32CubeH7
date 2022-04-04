@@ -28,6 +28,7 @@
 #include "ff.h"
 #include <string.h>
 #include <stdlib.h>
+#include "netif/ppp/pppcrypt.h"
 
 #define MAX_HOST_LEN 128
 #define MAX_URI_LEN 512
@@ -39,6 +40,7 @@
 #define HTTP_PREFIX "http://"
 #define HTTPS_PREFIX "https://"
 #define ACCEPT_RANGES "Accept-Ranges:"
+#define MD5_HASH_SIZE		16
 
 typedef struct loader_worker{
     httpc_connection_t conn_settings;
@@ -50,6 +52,8 @@ typedef struct loader_worker{
     char host[MAX_HOST_LEN];
     char uri[MAX_URI_LEN];
     char filename[MAX_NAME_LEN];
+    unsigned char hash[MD5_HASH_SIZE];
+    lwip_md5_context ctx;
     uint32_t total_len;
     uint32_t recved_len;
     uint32_t start_time;
@@ -60,6 +64,7 @@ typedef struct loader_worker{
     uint8_t support_range;
     uint8_t is_cancelled;
     uint8_t fd_valid;
+    uint8_t use_md5;
 }loader_worker_t;
 
 typedef struct loader_mgt{
@@ -165,7 +170,7 @@ uint32_t time_span(uint32_t start){
 static char console_buf[128];
 void on_httpc_finish(void *arg, httpc_result_t httpc_result, u32_t rx_content_len, u32_t srv_res, err_t err){
     loader_worker_t *worker = (loader_worker_t *)arg;
-    int is_finished = 0, n = 0;
+    int is_finished = 0, n = 0, idx = 0, i = 0;
     if(worker->total_len > 0 && worker->recved_len >= worker->total_len){
         is_finished += 1;
     }
@@ -182,6 +187,25 @@ void on_httpc_finish(void *arg, httpc_result_t httpc_result, u32_t rx_content_le
 	
         printf("download stop code[%d], %u/%u, spent=%ums\r\n", is_finished, worker->recved_len, worker->total_len, time_span(worker->start_time));
         worker_close_file(worker);
+
+
+        //printf md5
+        if(worker->use_md5){
+            console_buf[idx++] = 'M';
+            console_buf[idx++] = 'D';
+            console_buf[idx++] = '5';
+            console_buf[idx++] = ':';
+            for(i = 0;i < MD5_HASH_SIZE; i++){
+                n = snprintf(&console_buf[idx], 128 - idx, "%02x", worker->hash[i]);
+                idx += n;
+            }
+            console_buf[idx++] = '\r';
+            console_buf[idx++] = '\n';
+            console_buf[idx] = 0;
+            udp_console_send(console_buf, idx);
+            printf("download stop %s", console_buf);
+        }
+
         mgr_release(get_mgr_singleton());
     }else{
         sys_timeout(3000, worker_restart, worker);
@@ -351,6 +375,10 @@ void worker_open_file(loader_worker_t *worker){
     }
   
     worker->fd_valid = 1;
+    if(worker->use_md5){
+        lwip_md5_init(&worker->ctx);
+        lwip_md5_starts(&worker->ctx);
+    }
 
     //for test
     SDMMC_Clock_Set(6);
@@ -365,6 +393,12 @@ void worker_close_file(loader_worker_t *worker){
 
     //save remaining data
     if(worker->cache_len > 0){
+        if(worker->use_md5){
+            lwip_md5_update(&worker->ctx, worker->cache_data, worker->cache_len);
+            lwip_md5_finish(&worker->ctx, worker->hash);
+            lwip_md5_free(&worker->ctx);
+        }
+
         f_write(&worker->fd, worker->cache_data, worker->cache_len, (UINT*)&n);
         if(worker->cache_len != n){
             printf("file flush error, %u/%u\r\n", n, worker->cache_len);
@@ -384,6 +418,7 @@ void worker_close_file(loader_worker_t *worker){
     }
   
     worker->fd_valid = 0;
+    
 }
 
 void worker_write_file(loader_worker_t *worker, uint8_t *data, uint32_t len){
@@ -411,6 +446,9 @@ void worker_write_file(loader_worker_t *worker, uint8_t *data, uint32_t len){
     if(worker->cache_len >= MAX_MAX_CACHE_LEN){
         other = worker->cache_len%SECTOR_SIZE;
         wlen = worker->cache_len - other;
+        if(worker->use_md5){
+            lwip_md5_update(&worker->ctx, worker->cache_data, wlen);
+        }
 
         cur_time = sys_now();
         f_write(&worker->fd, worker->cache_data, wlen, (UINT*)&n);
@@ -429,7 +467,7 @@ void worker_write_file(loader_worker_t *worker, uint8_t *data, uint32_t len){
 
 }
 
-int download_start(char * url)
+int download_start(char * url, int enable_md5)
 {
     int ret = 0;
     
@@ -448,6 +486,7 @@ int download_start(char * url)
     }
     m->worker_cnt++;
     worker->worker_id = m->worker_cnt;
+    worker->use_md5 = enable_md5;
     printf("extract info in url: host=%s, uri=%s\r\n", worker->host, worker->uri);
     ret = worker_start(worker);
     if(ret != ERR_OK){
