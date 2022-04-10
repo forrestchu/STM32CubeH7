@@ -56,6 +56,7 @@ typedef struct loader_worker{
     lwip_md5_context ctx;
     uint32_t total_len;
     uint32_t recved_len;
+    uint32_t start_pos;
     uint32_t start_time;
     uint32_t conn_start_time;
     uint32_t conn_id;
@@ -82,7 +83,7 @@ err_t httpc_close(httpc_state_t* req, httpc_result_t result, u32_t server_respon
 
 loader_mgt_t g_mgr = {0};
 loader_worker_t g_worker = {0};
-static char file_name_prefix = 'a';//add a prefix char to file name, only for test
+//static char file_name_prefix = 'a';//add a prefix char to file name, only for test
 
 loader_mgt_t *get_mgr_singleton(){
     return &g_mgr;
@@ -138,7 +139,7 @@ int get_host_and_uri(char *url, char *host, char *uri, char *fn)
     uri[u_len] = 0;
     host[h_len] = 0;
 
-    fn[f_len++] = file_name_prefix++;
+    //fn[f_len++] = file_name_prefix++;
     if(last > 0 && last < url_len - 1){
         last++;
         while(last < url_len){
@@ -238,6 +239,10 @@ err_t on_httpc_headers(httpc_state_t *connection, void *arg, struct pbuf *hdr, u
         if(lwip_strnstr((char *)hdr->payload, ACCEPT_RANGES, hdr_len) != NULL){
             printf("header: range supported\r\n");
             worker->support_range = 1;
+        }else if(worker->start_pos > 0){
+            printf("error: range not supported but start_pos >0 \r\n");
+            worker->is_cancelled = 1;
+            return ERR_ARG;
         }
         
         worker_open_file(worker);
@@ -294,7 +299,11 @@ err_t worker_start(loader_worker_t *worker){
     worker->conn_settings.use_proxy = 0;
     worker->conn_settings.headers_done_fn = on_httpc_headers;
     worker->conn_settings.result_fn = on_httpc_finish;
+    worker->conn_settings.start_pos = worker->start_pos;
     worker->start_time = sys_now();
+    if(worker->start_pos > 0 && worker_check_file(worker) < 0){
+        return ERR_ARG;
+    }
     
     err = httpc_get_file_dns(worker->host, 80, worker->uri, &worker->conn_settings, on_httpc_data, worker, &worker->conn_state);
     return err;
@@ -306,7 +315,7 @@ void worker_restart(loader_worker_t *worker){
         return;
     }
     
-    worker->conn_settings.start_pos = worker->support_range?worker->recved_len:0;
+    worker->conn_settings.start_pos = worker->support_range?worker->recved_len+worker->start_pos:0;
     worker->conn_id++;
     
     if(worker->support_range == 0){
@@ -342,7 +351,62 @@ void worker_stop(loader_worker_t *worker){
     printf("stopped by user\r\n");
 }
 
+int worker_check_file(loader_worker_t *worker){
+    int ret = 0;
+    if(strlen(worker->filename) <= 0){
+        printf("file name empty\r\n");
+        return -1;
+    }
+    
+    if(worker->fd_valid){
+        printf("file already openned\r\n");
+        return -2;
+    }
+    
+    if(f_mount(&worker->fs, (TCHAR const*)"", 0) != FR_OK)
+    {
+        printf("f_mount error\r\n");
+        return -3;
+    }
+    
+    if (f_opendir(&worker->dir, "/") != FR_OK)
+    {
+        f_mount(NULL, (TCHAR const*)"",0);
+        printf("f_opendir error\r\n");
+        return -4;
+    }
+    
+    if (f_open(&worker->fd, (const TCHAR*)worker->filename, FA_OPEN_ALWAYS|FA_READ) != FR_OK)
+    {
+        printf("f_open error\r\n");
+        f_mount(NULL, (TCHAR const*)"",0);
+        return -5;
+    }
+  
+    if(f_size(&worker->fd) < worker->start_pos){
+        printf("error start_pos[%d] > filesize[%d]\r\n", worker->start_pos, f_size(&worker->fd));
+        ret = -6;
+    }
+
+    if (f_close(&worker->fd) != FR_OK)
+    {
+        printf("wanning: f_close error\r\n");
+    }
+    
+    if (f_mount(NULL, (TCHAR const*)"",0) != FR_OK)
+    {
+        printf("wanning: unmount error\r\n");
+    }
+
+    return ret;
+}
 void worker_open_file(loader_worker_t *worker){
+    uint32_t len = 0, tot = 0, rlen = 0;
+    FRESULT ret = FR_OK;
+    BYTE mode = FA_CREATE_ALWAYS | FA_WRITE;
+    if(worker->start_pos > 0){
+        mode = FA_READ | FA_WRITE | FA_OPEN_ALWAYS;
+    }
     
     if(strlen(worker->filename) <= 0){
         printf("file name empty\r\n");
@@ -367,7 +431,7 @@ void worker_open_file(loader_worker_t *worker){
         return;
     }
     
-    if (f_open(&worker->fd, (const TCHAR*)worker->filename, FA_CREATE_ALWAYS|FA_WRITE) != FR_OK)
+    if (f_open(&worker->fd, (const TCHAR*)worker->filename, mode) != FR_OK)
     {
         printf("f_open error\r\n");
         f_mount(NULL, (TCHAR const*)"",0);
@@ -378,6 +442,32 @@ void worker_open_file(loader_worker_t *worker){
     if(worker->use_md5){
         lwip_md5_init(&worker->ctx);
         lwip_md5_starts(&worker->ctx);
+    }
+
+    if(worker->start_pos > 0){
+        if(worker->use_md5){
+            tot = worker->start_pos;
+            while(tot > 0){
+                rlen = tot >= MAX_MAX_CACHE_LEN?MAX_MAX_CACHE_LEN:tot;
+                len = 0;
+                ret = f_read(&worker->fd, worker->cache_data, rlen, (UINT*)(&len));
+                if(ret != FR_OK || len <= 0){
+                    printf("f_read error [%d], len[%d]\r\n", ret, len);
+                    break;
+                }
+                if(len != rlen){
+                    printf("f_read warnning req[%d], ret[%d]\r\n", rlen, len);
+                }
+                
+                lwip_md5_update(&worker->ctx, worker->cache_data, len);
+                tot -= len;
+            }
+        }else{
+            ret = f_lseek (&worker->fd, worker->start_pos);
+            if(ret != FR_OK){
+                printf("f_lseek error [%d], data may lost\r\n", ret);
+            }
+        }
     }
 
     //for test
@@ -467,7 +557,7 @@ void worker_write_file(loader_worker_t *worker, uint8_t *data, uint32_t len){
 
 }
 
-int download_start(char * url, int enable_md5)
+int download_start(char * url, int enable_md5, int start_pos)
 {
     int ret = 0;
     
@@ -475,6 +565,11 @@ int download_start(char * url, int enable_md5)
     if(m->is_running){
         printf("request canceled, a task is still running\r\n");
         return -1;
+    }
+    
+    if(start_pos < 0){
+        printf("request canceled, wrong parameter\r\n");
+        return -4;
     }
     
     loader_worker_t *worker = worker_new();
@@ -487,6 +582,7 @@ int download_start(char * url, int enable_md5)
     m->worker_cnt++;
     worker->worker_id = m->worker_cnt;
     worker->use_md5 = enable_md5;
+    worker->start_pos = start_pos;
     printf("extract info in url: host=%s, uri=%s\r\n", worker->host, worker->uri);
     ret = worker_start(worker);
     if(ret != ERR_OK){

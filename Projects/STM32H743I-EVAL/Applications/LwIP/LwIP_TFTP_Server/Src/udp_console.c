@@ -104,7 +104,7 @@ void on_data(void *arg, struct udp_pcb *upcb, struct pbuf *p, const ip_addr_t *a
             }
         }
         
-        ret = download_start(url, 0);
+        ret = download_start(url, 0, 0);
         //printf("start: ret=%d\r\n", ret);
         if(ret == 0){
             re_addr = *addr;
@@ -125,7 +125,7 @@ void on_data(void *arg, struct udp_pcb *upcb, struct pbuf *p, const ip_addr_t *a
             }
         }
         
-        ret = download_start(url, 1);
+        ret = download_start(url, 1, 0);
         //printf("start: ret=%d\r\n", ret);
         if(ret == 0){
             re_addr = *addr;
