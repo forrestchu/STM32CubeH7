@@ -32,6 +32,7 @@
 
 #define MAX_HOST_LEN 128
 #define MAX_URI_LEN 512
+#define SECTOR_SIZE 512
 #define MAX_NAME_LEN 128
 #define MAX_MAX_CACHE_LEN (512 - 6)*1024
 #define CACHE_ADDR 0x24000000
@@ -516,7 +517,6 @@ void worker_write_file(loader_worker_t *worker, uint8_t *data, uint32_t len){
     uint32_t n = 0;
     uint32_t cur_time = 0;
     uint32_t wlen = 0, other = 0;
-    #define SECTOR_SIZE 512
     if(!worker->fd_valid){
         printf("file not openned, [%d] dropped\r\n", len);
         return;
@@ -560,6 +560,7 @@ void worker_write_file(loader_worker_t *worker, uint8_t *data, uint32_t len){
 int download_start(char * url, int enable_md5, int start_pos)
 {
     int ret = 0;
+    int mod = 0;
     
     loader_mgt_t * m= get_mgr_singleton();
     if(m->is_running){
@@ -570,6 +571,12 @@ int download_start(char * url, int enable_md5, int start_pos)
     if(start_pos < 0){
         printf("request canceled, wrong parameter\r\n");
         return -4;
+    }
+
+    if(start_pos > 0){
+        //make sure we are 512 aligned, to ensure sd write speed
+        mod= start_pos%SECTOR_SIZE;
+        start_pos -= mod;
     }
     
     loader_worker_t *worker = worker_new();
