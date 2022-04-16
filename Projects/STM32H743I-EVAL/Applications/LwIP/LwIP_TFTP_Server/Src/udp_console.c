@@ -24,13 +24,15 @@
 #include "lwip/def.h"
 #include <string.h>
 #include <stdio.h>
-
+#include "lwip/igmp.h"
 #include "udp_console.h"
 #include "httpc_loader.h"
 void on_data(void *arg, struct udp_pcb *upcb, struct pbuf *p, const ip_addr_t *addr, u16_t port);
 static struct udp_pcb *local_pcb = NULL;
 static ip_addr_t re_addr = {0};
 static u16_t re_port = 0;
+static ip4_addr_t mul_addr;
+static ip4_addr_t any_addr;
 void udp_console_init(void)
 {
     struct udp_pcb *upcb;
@@ -38,6 +40,10 @@ void udp_console_init(void)
     
     /* Create a new UDP control block  */
     upcb = udp_new();
+    IP4_ADDR(&any_addr, 0, 0, 0, 0);
+    IP4_ADDR(&mul_addr, 233, 0, 0, 6);
+    err = igmp_joingroup(&any_addr, &mul_addr);
+    printf("igmp_joingroup ret = %d\r\n", err);
     
     if (upcb)
     {
